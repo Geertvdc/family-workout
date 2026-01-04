@@ -17,17 +17,27 @@ This project follows Clean Architecture principles with the following layers:
 - .NET 10 SDK
 - Docker (for Cosmos DB emulator when using Aspire)
 - Or Azure Cosmos DB Emulator for Windows
+- Aspire CLI (install with: `dotnet tool install -g aspire.cli`)
 
 ## Running Locally
 
 ### Option 1: Using .NET Aspire (Recommended)
 
-.NET Aspire provides integrated orchestration for the entire application stack:
+.NET Aspire provides integrated orchestration for the entire application stack.
 
+**First-time setup:**
 ```bash
-# Run the AppHost - it will start everything (API, Blazor, Cosmos DB emulator)
-cd aspire/FamilyFitness.AppHost
-dotnet run
+# Install Aspire CLI globally
+dotnet tool install -g aspire.cli
+
+# Navigate to the project root
+cd /path/to/family-workout
+```
+
+**Run the application:**
+```bash
+# Use aspire CLI to run the AppHost
+aspire run aspire/FamilyFitness.AppHost/FamilyFitness.AppHost.csproj
 ```
 
 This will:
@@ -88,7 +98,7 @@ family-workout/
 │   ├── FamilyFitness.Api/
 │   └── FamilyFitness.Blazor/
 ├── aspire/
-│   └── FamilyFitness.AppHost/  # Aspire orchestration for local development
+│   └── FamilyFitness.AppHost/  # Aspire orchestration (requires Aspire CLI: dotnet tool install -g aspire.cli)
 └── tests/
     ├── FamilyFitness.UnitTests/
     ├── FamilyFitness.IntegrationTests/
@@ -140,7 +150,15 @@ Or use the Data Explorer in the Cosmos DB Emulator UI.
 - **Clean Architecture**: Respect layer boundaries and dependencies
 - **Keep It Simple**: Don't add complexity until needed
 - **Immutable Domain Entities**: Use constructor validation and `With*` methods for updates
-- **Local Development with Aspire**: Use .NET Aspire for integrated local development experience
+- **Local Development with Aspire**: Use .NET Aspire CLI for integrated local development experience
+
+## Aspire Setup Notes
+
+In .NET 10, Aspire moved from a workload to standalone NuGet packages and CLI tools:
+- The project uses `Aspire.AppHost.Sdk/13.1.0` for the AppHost
+- Requires `dotnet tool install -g aspire.cli` to run
+- Use `aspire run` command instead of `dotnet run` for the AppHost
+- Dashboard and DCP (Developer Control Plane) binaries are automatically downloaded as NuGet packages
 
 ## Contributing
 
