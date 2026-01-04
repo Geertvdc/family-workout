@@ -15,7 +15,7 @@ This single command will:
 1. Start the Cosmos DB emulator in a Docker container (requires Docker)
 2. Start the API with proper connection strings
 3. Start the Blazor UI with proper API URL configuration
-4. Open the Aspire dashboard at https://localhost:17023 (or similar)
+4. Display the Aspire dashboard URL in the console output
 
 From the Aspire dashboard you can:
 - View logs from all services
