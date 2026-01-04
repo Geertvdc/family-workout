@@ -5,9 +5,6 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <IsAspireHost>true</IsAspireHost>
-    <NoWarn>$(NoWarn);NETSDK1228</NoWarn>
-    <SuppressNETSDK1228>true</SuppressNETSDK1228>
   </PropertyGroup>
 
   <ItemGroup>

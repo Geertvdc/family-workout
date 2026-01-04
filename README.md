@@ -15,17 +15,41 @@ This project follows Clean Architecture principles with the following layers:
 ## Prerequisites
 
 - .NET 10 SDK
-- Azure Cosmos DB Emulator (for local development)
+- Docker (for Cosmos DB emulator when using Aspire)
+- Or Azure Cosmos DB Emulator for Windows
 
 ## Running Locally
 
-### Option 1: Using Docker Compose (Recommended)
+### Option 1: Using .NET Aspire (Recommended)
+
+.NET Aspire provides integrated orchestration for the entire application stack:
 
 ```bash
-# Start Cosmos DB emulator
+# Run the AppHost - it will start everything (API, Blazor, Cosmos DB emulator)
+cd aspire/FamilyFitness.AppHost
+dotnet run
+```
+
+This will:
+- Start the Cosmos DB emulator in a Docker container
+- Start the API project with the correct connection string
+- Start the Blazor project with the correct API URL
+- Open the Aspire dashboard where you can monitor all services
+
+**Note**: Requires Docker to be running for the Cosmos DB emulator.
+
+### Option 2: Run Services Manually
+
+If you prefer to run services individually or don't have Docker:
+
+```bash
+# Option A: Using Docker for Cosmos DB
 docker run -d -p 8081:8081 -p 10250-10255:10250-10255 \
   --name cosmos-emulator \
   mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest
+
+# Option B: Using Azure Cosmos DB Emulator (Windows)
+# Install and start from https://aka.ms/cosmosdb-emulator
 
 # Run the API
 cd src/FamilyFitness.Api
@@ -35,12 +59,6 @@ dotnet run
 cd src/FamilyFitness.Blazor
 dotnet run
 ```
-
-### Option 2: Using Azure Cosmos DB Emulator (Windows)
-
-1. Install and start the [Azure Cosmos DB Emulator](https://aka.ms/cosmosdb-emulator)
-2. Update connection strings in `appsettings.Development.json` if needed
-3. Run the API and Blazor projects as shown above
 
 ### Connection String Configuration
 
@@ -70,7 +88,7 @@ family-workout/
 │   ├── FamilyFitness.Api/
 │   └── FamilyFitness.Blazor/
 ├── aspire/
-│   └── FamilyFitness.AppHost/  # Aspire orchestration (currently blocked by SDK deprecation)
+│   └── FamilyFitness.AppHost/  # Aspire orchestration for local development
 └── tests/
     ├── FamilyFitness.UnitTests/
     ├── FamilyFitness.IntegrationTests/
@@ -108,7 +126,7 @@ The Blazor app runs on `https://localhost:7002` (or configured port) and provide
 
 ## Database Setup
 
-On first run, you'll need to create the Cosmos DB database and container:
+When using .NET Aspire, the Cosmos DB emulator is automatically configured. Otherwise, on first run you'll need to create the Cosmos DB database and container:
 
 1. Connect to your Cosmos DB emulator or instance
 2. Create a database named `family-fitness`
@@ -116,20 +134,13 @@ On first run, you'll need to create the Cosmos DB database and container:
 
 Or use the Data Explorer in the Cosmos DB Emulator UI.
 
-## Known Issues
-
-### Aspire AppHost
-
-The Aspire AppHost project (`aspire/FamilyFitness.AppHost`) is currently not functional due to .NET SDK 10.0 deprecating the Aspire workload. The Aspire team has moved to NuGet package-based distribution, but the project template and tooling are still in transition.
-
-**Workaround**: Run the API and Blazor projects separately as shown in the "Running Locally" section above.
-
 ## Development Principles
 
 - **Test-Driven Development (TDD)**: Write tests first, then implementation
 - **Clean Architecture**: Respect layer boundaries and dependencies
 - **Keep It Simple**: Don't add complexity until needed
 - **Immutable Domain Entities**: Use constructor validation and `With*` methods for updates
+- **Local Development with Aspire**: Use .NET Aspire for integrated local development experience
 
 ## Contributing
 
