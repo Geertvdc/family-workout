@@ -5,11 +5,19 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <IsAspireHost>true</IsAspireHost>
+    <NoWarn>$(NoWarn);NETSDK1228</NoWarn>
+    <SuppressNETSDK1228>true</SuppressNETSDK1228>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.AppHost" Version="13.1.0" />
     <PackageReference Include="Aspire.Hosting.Azure.CosmosDB" Version="13.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\FamilyFitness.Api\FamilyFitness.Api.csproj" />
+    <ProjectReference Include="..\..\src\FamilyFitness.Blazor\FamilyFitness.Blazor.csproj" />
   </ItemGroup>
 
 </Project>
