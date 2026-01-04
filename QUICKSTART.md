@@ -2,6 +2,34 @@
 
 ## Running the FamilyFitness App Locally
 
+### Using .NET Aspire (Easiest Method)
+
+.NET Aspire orchestrates all services automatically:
+
+```bash
+cd aspire/FamilyFitness.AppHost
+dotnet run
+```
+
+This single command will:
+1. Start the Cosmos DB emulator in a Docker container (requires Docker)
+2. Start the API with proper connection strings
+3. Start the Blazor UI with proper API URL configuration
+4. Open the Aspire dashboard at https://localhost:17023 (or similar)
+
+From the Aspire dashboard you can:
+- View logs from all services
+- Monitor resource usage
+- Access direct links to API and Blazor UI
+
+**Requirements**: Docker must be running for the Cosmos DB emulator.
+
+---
+
+### Manual Setup (Alternative Method)
+
+If you prefer to run services individually or don't have Docker:
+
 ### 1. Start Cosmos DB Emulator
 
 **Option A: Using Docker (Linux/Mac/Windows with WSL)**

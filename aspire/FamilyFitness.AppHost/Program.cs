@@ -8,11 +8,11 @@ var cosmos = builder.AddAzureCosmosDB("cosmos")
     });
 
 // Add the API project with Cosmos DB reference
-var api = builder.AddProject<Projects.FamilyFitness_Api>("api")
+var api = builder.AddProject("api", "../../src/FamilyFitness.Api/FamilyFitness.Api.csproj")
     .WithReference(cosmos);
 
 // Add the Blazor project with API reference
-builder.AddProject<Projects.FamilyFitness_Blazor>("blazor")
+builder.AddProject("blazor", "../../src/FamilyFitness.Blazor/FamilyFitness.Blazor.csproj")
     .WithEnvironment("ApiUrl", api.GetEndpoint("https"));
 
 builder.Build().Run();
