@@ -4,11 +4,21 @@
 
 ### Using .NET Aspire (Easiest Method)
 
-.NET Aspire orchestrates all services automatically:
+.NET Aspire orchestrates all services automatically.
 
+**First-time setup:**
 ```bash
-cd aspire/FamilyFitness.AppHost
-dotnet run
+# Install Aspire CLI globally (one-time setup)
+dotnet tool install -g aspire.cli
+```
+
+**Run the application:**
+```bash
+# Navigate to project root
+cd /path/to/family-workout
+
+# Run with Aspire CLI
+aspire run aspire/FamilyFitness.AppHost/FamilyFitness.AppHost.csproj
 ```
 
 This single command will:
@@ -22,7 +32,9 @@ From the Aspire dashboard you can:
 - Monitor resource usage
 - Access direct links to API and Blazor UI
 
-**Requirements**: Docker must be running for the Cosmos DB emulator.
+**Requirements**: 
+- Docker must be running for the Cosmos DB emulator
+- Aspire CLI installed (`dotnet tool install -g aspire.cli`)
 
 ---
 
