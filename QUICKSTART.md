@@ -2,7 +2,47 @@
 
 ## Running the FamilyFitness App Locally
 
-### Using .NET Aspire (Easiest Method)
+### For ARM Mac Users (Apple Silicon) - Special Instructions
+
+⚠️ **Important**: The Cosmos DB emulator doesn't support ARM architecture. Follow these steps instead:
+
+**Option 1: Use Azure Cosmos DB (Recommended)**
+
+1. Create a free Azure Cosmos DB account:
+   - Go to https://portal.azure.com
+   - Create a new Cosmos DB account (Core SQL API)
+   - Get your connection string from "Keys" section
+
+2. Configure the ARM-compatible AppHost:
+   ```bash
+   cd aspire/FamilyFitness.AppHost
+   # Backup original and use ARM template
+   cp Program.cs Program.cs.x64
+   cp Program.ARM.cs.template Program.cs
+   ```
+
+3. Update connection string in `src/FamilyFitness.Api/appsettings.Development.json`:
+   ```json
+   {
+     "ConnectionStrings": {
+       "cosmos": "AccountEndpoint=https://YOUR-ACCOUNT.documents.azure.com:443/;AccountKey=YOUR-KEY;"
+     }
+   }
+   ```
+
+4. Install Aspire CLI and run:
+   ```bash
+   dotnet tool install -g aspire.cli
+   aspire run aspire/FamilyFitness.AppHost/FamilyFitness.AppHost.csproj
+   ```
+
+**Option 2: Run Without Aspire**
+
+Skip Aspire and run services manually (see "Manual Setup" section below).
+
+---
+
+### For x64 Systems (Intel/AMD) - Using .NET Aspire
 
 .NET Aspire orchestrates all services automatically.
 
@@ -40,11 +80,11 @@ From the Aspire dashboard you can:
 
 ### Manual Setup (Alternative Method)
 
-If you prefer to run services individually or don't have Docker:
+If you prefer to run services individually:
 
-### 1. Start Cosmos DB Emulator
+### 1. Start Cosmos DB
 
-**Option A: Using Docker (Linux/Mac/Windows with WSL)**
+**For x64 with Docker:**
 ```bash
 docker run -d -p 8081:8081 -p 10250-10255:10250-10255 \
   --name cosmos-emulator \
@@ -53,22 +93,26 @@ docker run -d -p 8081:8081 -p 10250-10255:10250-10255 \
   mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest
 ```
 
-**Option B: Azure Cosmos DB Emulator (Windows)**
+**For ARM Mac:**
+- Use Azure Cosmos DB cloud service (see ARM Mac section above)
+- Configure connection string in `src/FamilyFitness.Api/appsettings.Development.json`
+
+**For Windows:**
 - Download and install from: https://aka.ms/cosmosdb-emulator
 - Start the emulator
 - It will be available at https://localhost:8081
 
 ### 2. Create Database and Container
 
-Using the Cosmos DB Emulator Data Explorer (https://localhost:8081/_explorer/index.html):
+**For Emulator:** Using the Cosmos DB Emulator Data Explorer (https://localhost:8081/_explorer/index.html)
+
+**For Azure Cosmos DB:** Using Azure Portal Data Explorer
 
 1. Create a new database: `family-fitness`
 2. Create a new container:
    - Container ID: `workout-types`
    - Partition key: `/PartitionKey`
    - Throughput: 400 RU/s (manual)
-
-Or using Azure Data Studio or any Cosmos DB client.
 
 ### 3. Run the API
 

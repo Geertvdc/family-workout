@@ -15,13 +15,14 @@ This project follows Clean Architecture principles with the following layers:
 ## Prerequisites
 
 - .NET 10 SDK
-- Docker (for Cosmos DB emulator when using Aspire)
-- Or Azure Cosmos DB Emulator for Windows
+- **For x64 systems**: Docker (for Cosmos DB emulator when using Aspire)
+- **For ARM Macs (Apple Silicon)**: Azure Cosmos DB account (emulator not supported on ARM)
+- **For Windows**: Azure Cosmos DB Emulator
 - Aspire CLI (install with: `dotnet tool install -g aspire.cli`)
 
 ## Running Locally
 
-### Option 1: Using .NET Aspire (Recommended)
+### Option 1: Using .NET Aspire (Recommended for x64 systems)
 
 .NET Aspire provides integrated orchestration for the entire application stack.
 
@@ -46,19 +47,48 @@ This will:
 - Start the Blazor project with the correct API URL
 - Open the Aspire dashboard where you can monitor all services
 
-**Note**: Requires Docker to be running for the Cosmos DB emulator.
+**⚠️ Important for ARM Mac Users (Apple Silicon):**
+
+The Cosmos DB emulator Docker image doesn't support ARM architecture. You have two options:
+
+**Option A: Use Azure Cosmos DB Cloud Service (Recommended)**
+1. Create a free Azure Cosmos DB account at https://portal.azure.com
+2. Use the ARM-compatible Program.cs:
+   ```bash
+   cd aspire/FamilyFitness.AppHost
+   # Backup original and use ARM template
+   cp Program.cs Program.cs.x64
+   cp Program.ARM.cs.template Program.cs
+   ```
+3. Update `src/FamilyFitness.Api/appsettings.Development.json` with your Azure Cosmos DB connection string:
+   ```json
+   {
+     "ConnectionStrings": {
+       "cosmos": "AccountEndpoint=https://YOUR-ACCOUNT.documents.azure.com:443/;AccountKey=YOUR-KEY;"
+     }
+   }
+   ```
+4. Run: `aspire run aspire/FamilyFitness.AppHost/FamilyFitness.AppHost.csproj`
+
+**Option B: Run Services Manually (without Aspire)**
+See "Option 2: Run Services Manually" below and use Azure Cosmos DB connection string.
+
+**Note**: Requires Docker to be running for x64 systems with Cosmos DB emulator.
 
 ### Option 2: Run Services Manually
 
-If you prefer to run services individually or don't have Docker:
+If you prefer to run services individually or are on ARM Mac:
 
 ```bash
-# Option A: Using Docker for Cosmos DB
+# For ARM Mac: Use Azure Cosmos DB cloud service
+# Configure connection string in src/FamilyFitness.Api/appsettings.Development.json
+
+# For x64 systems with Docker:
 docker run -d -p 8081:8081 -p 10250-10255:10250-10255 \
   --name cosmos-emulator \
   mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest
 
-# Option B: Using Azure Cosmos DB Emulator (Windows)
+# For Windows: Azure Cosmos DB Emulator
 # Install and start from https://aka.ms/cosmosdb-emulator
 
 # Run the API
