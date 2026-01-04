@@ -1,0 +1,216 @@
+@page "/workout-types"
+@using System.Net.Http.Json
+@inject HttpClient Http
+@rendermode InteractiveServer
+
+<h3>Workout Types</h3>
+
+@if (errorMessage != null)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+@if (successMessage != null)
+{
+    <div class="alert alert-success">@successMessage</div>
+}
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <h4>Create New Workout Type</h4>
+        <EditForm Model="@newWorkoutType" OnValidSubmit="@CreateWorkoutType">
+            <div class="mb-3">
+                <label class="form-label">Name *</label>
+                <InputText class="form-control" @bind-Value="newWorkoutType.Name" required />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Description</label>
+                <InputTextArea class="form-control" @bind-Value="newWorkoutType.Description" rows="3" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Estimated Duration (minutes)</label>
+                <InputNumber class="form-control" @bind-Value="newWorkoutType.EstimatedDurationMinutes" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Intensity *</label>
+                <InputSelect class="form-control" @bind-Value="newWorkoutType.Intensity">
+                    <option value="Light">Light</option>
+                    <option value="Moderate">Moderate</option>
+                    <option value="Intense">Intense</option>
+                </InputSelect>
+            </div>
+            <button type="submit" class="btn btn-primary" disabled="@isCreating">
+                @if (isCreating)
+                {
+                    <span>Creating...</span>
+                }
+                else
+                {
+                    <span>Create</span>
+                }
+            </button>
+        </EditForm>
+    </div>
+</div>
+
+<h4>All Workout Types</h4>
+
+@if (workoutTypes == null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (!workoutTypes.Any())
+{
+    <p><em>No workout types found. Create one above to get started!</em></p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Duration (min)</th>
+                <th>Intensity</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var workoutType in workoutTypes)
+            {
+                <tr>
+                    <td>@workoutType.Name</td>
+                    <td>@(workoutType.Description ?? "-")</td>
+                    <td>@(workoutType.EstimatedDurationMinutes?.ToString() ?? "-")</td>
+                    <td>
+                        <span class="badge bg-@GetIntensityColor(workoutType.Intensity)">
+                            @workoutType.Intensity
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-danger" @onclick="() => DeleteWorkoutType(workoutType.Id)">
+                            Delete
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<WorkoutTypeDto>? workoutTypes;
+    private CreateWorkoutTypeModel newWorkoutType = new();
+    private bool isCreating = false;
+    private string? errorMessage;
+    private string? successMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadWorkoutTypes();
+    }
+
+    private async Task LoadWorkoutTypes()
+    {
+        try
+        {
+            errorMessage = null;
+            workoutTypes = await Http.GetFromJsonAsync<List<WorkoutTypeDto>>("/api/workout-types");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load workout types: {ex.Message}";
+        }
+    }
+
+    private async Task CreateWorkoutType()
+    {
+        try
+        {
+            isCreating = true;
+            errorMessage = null;
+            successMessage = null;
+
+            var response = await Http.PostAsJsonAsync("/api/workout-types", newWorkoutType);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                successMessage = "Workout type created successfully!";
+                newWorkoutType = new CreateWorkoutTypeModel();
+                await LoadWorkoutTypes();
+            }
+            else
+            {
+                var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+                errorMessage = error?.error ?? "Failed to create workout type";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isCreating = false;
+        }
+    }
+
+    private async Task DeleteWorkoutType(string id)
+    {
+        try
+        {
+            errorMessage = null;
+            successMessage = null;
+
+            var response = await Http.DeleteAsync($"/api/workout-types/{id}");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                successMessage = "Workout type deleted successfully!";
+                await LoadWorkoutTypes();
+            }
+            else
+            {
+                var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+                errorMessage = error?.error ?? "Failed to delete workout type";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    private string GetIntensityColor(string intensity)
+    {
+        return intensity switch
+        {
+            "Light" => "success",
+            "Moderate" => "warning",
+            "Intense" => "danger",
+            _ => "secondary"
+        };
+    }
+
+    public class WorkoutTypeDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public int? EstimatedDurationMinutes { get; set; }
+        public string Intensity { get; set; } = string.Empty;
+    }
+
+    public class CreateWorkoutTypeModel
+    {
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public int? EstimatedDurationMinutes { get; set; }
+        public string Intensity { get; set; } = "Moderate";
+    }
+
+    public class ErrorResponse
+    {
+        public string error { get; set; } = string.Empty;
+    }
+}
