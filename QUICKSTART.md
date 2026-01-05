@@ -2,49 +2,9 @@
 
 ## Running the FamilyFitness App Locally
 
-### For ARM Mac Users (Apple Silicon) - Special Instructions
+### Using .NET Aspire (Recommended)
 
-⚠️ **Important**: The Cosmos DB emulator doesn't support ARM architecture. Follow these steps instead:
-
-**Option 1: Use Azure Cosmos DB (Recommended)**
-
-1. Create a free Azure Cosmos DB account:
-   - Go to https://portal.azure.com
-   - Create a new Cosmos DB account (Core SQL API)
-   - Get your connection string from "Keys" section
-
-2. Configure the ARM-compatible AppHost:
-   ```bash
-   cd aspire/FamilyFitness.AppHost
-   # Backup original and use ARM template
-   cp Program.cs Program.cs.x64
-   cp Program.ARM.cs.template Program.cs
-   ```
-
-3. Update connection string in `src/FamilyFitness.Api/appsettings.Development.json`:
-   ```json
-   {
-     "ConnectionStrings": {
-       "cosmos": "AccountEndpoint=https://YOUR-ACCOUNT.documents.azure.com:443/;AccountKey=YOUR-KEY;"
-     }
-   }
-   ```
-
-4. Install Aspire CLI and run:
-   ```bash
-   dotnet tool install -g aspire.cli
-   aspire run aspire/FamilyFitness.AppHost/FamilyFitness.AppHost.csproj
-   ```
-
-**Option 2: Run Without Aspire**
-
-Skip Aspire and run services manually (see "Manual Setup" section below).
-
----
-
-### For x64 Systems (Intel/AMD) - Using .NET Aspire
-
-.NET Aspire orchestrates all services automatically.
+.NET Aspire orchestrates all services automatically and works on all platforms.
 
 **First-time setup:**
 ```bash
@@ -62,7 +22,7 @@ aspire run aspire/FamilyFitness.AppHost/FamilyFitness.AppHost.csproj
 ```
 
 This single command will:
-1. Start the Cosmos DB emulator in a Docker container (requires Docker)
+1. Start PostgreSQL in a Docker container (requires Docker)
 2. Start the API with proper connection strings
 3. Start the Blazor UI with proper API URL configuration
 4. Display the Aspire dashboard URL in the console output
@@ -73,8 +33,10 @@ From the Aspire dashboard you can:
 - Access direct links to API and Blazor UI
 
 **Requirements**: 
-- Docker must be running for the Cosmos DB emulator
+- Docker must be running
 - Aspire CLI installed (`dotnet tool install -g aspire.cli`)
+
+**Note**: PostgreSQL works on all platforms including ARM Macs (Apple Silicon), Intel Macs, Windows, and Linux.
 
 ---
 
@@ -82,39 +44,24 @@ From the Aspire dashboard you can:
 
 If you prefer to run services individually:
 
-### 1. Start Cosmos DB
+### 1. Start PostgreSQL
 
-**For x64 with Docker:**
+**Using Docker:**
 ```bash
-docker run -d -p 8081:8081 -p 10250-10255:10250-10255 \
-  --name cosmos-emulator \
-  -e AZURE_COSMOS_EMULATOR_PARTITION_COUNT=2 \
-  -e AZURE_COSMOS_EMULATOR_ENABLE_DATA_PERSISTENCE=true \
-  mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest
+docker run -d \
+  --name family-fitness-postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=family_fitness \
+  -p 5432:5432 \
+  postgres:17
 ```
 
-**For ARM Mac:**
-- Use Azure Cosmos DB cloud service (see ARM Mac section above)
-- Configure connection string in `src/FamilyFitness.Api/appsettings.Development.json`
+**Using locally installed PostgreSQL:**
+- Ensure PostgreSQL is running
+- Create a database named `family_fitness`
+- Update connection string in `src/FamilyFitness.Api/appsettings.Development.json` if needed
 
-**For Windows:**
-- Download and install from: https://aka.ms/cosmosdb-emulator
-- Start the emulator
-- It will be available at https://localhost:8081
-
-### 2. Create Database and Container
-
-**For Emulator:** Using the Cosmos DB Emulator Data Explorer (https://localhost:8081/_explorer/index.html)
-
-**For Azure Cosmos DB:** Using Azure Portal Data Explorer
-
-1. Create a new database: `family-fitness`
-2. Create a new container:
-   - Container ID: `workout-types`
-   - Partition key: `/PartitionKey`
-   - Throughput: 400 RU/s (manual)
-
-### 3. Run the API
+### 2. Run the API
 
 ```bash
 cd src/FamilyFitness.Api
@@ -125,7 +72,7 @@ The API will start at:
 - HTTPS: https://localhost:7001
 - HTTP: http://localhost:5001
 
-### 4. Run the Blazor App
+### 3. Run the Blazor App
 
 In a new terminal:
 
@@ -138,14 +85,14 @@ The Blazor app will start at:
 - HTTPS: https://localhost:7002
 - HTTP: http://localhost:5002
 
-### 5. Access the Application
+### 4. Access the Application
 
 Open your browser and navigate to:
 - Blazor UI: https://localhost:7002
 - Navigate to "Workout Types" in the menu
 - Create, view, and delete workout types
 
-### 6. Test the API Directly
+### 5. Test the API Directly
 
 You can test the API using the Swagger UI:
 - Navigate to: https://localhost:7001/openapi/v1.json

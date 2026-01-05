@@ -1,6 +1,6 @@
 using FamilyFitness.Application;
 using FamilyFitness.Infrastructure;
-using Microsoft.Azure.Cosmos;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,20 +16,26 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Register Cosmos DB
-var cosmosConnectionString = builder.Configuration.GetConnectionString("cosmos") 
-    ?? throw new InvalidOperationException("Cosmos connection string not found");
-var cosmosClient = new CosmosClient(cosmosConnectionString);
-var database = cosmosClient.GetDatabase("family-fitness");
-var workoutTypesContainer = database.GetContainer("workout-types");
+// Register PostgreSQL
+var connectionString = builder.Configuration.GetConnectionString("postgres") 
+    ?? throw new InvalidOperationException("PostgreSQL connection string not found");
 
-builder.Services.AddSingleton(workoutTypesContainer);
-builder.Services.AddSingleton<IWorkoutTypeRepository>(sp => 
-    new CosmosWorkoutTypeRepository(sp.GetRequiredService<Container>()));
+builder.Services.AddDbContext<FamilyFitnessDbContext>(options =>
+    options.UseNpgsql(connectionString));
+
+builder.Services.AddScoped<IWorkoutTypeRepository, PostgresWorkoutTypeRepository>();
 builder.Services.AddSingleton<IIdGenerator, GuidIdGenerator>();
 builder.Services.AddScoped<WorkoutTypeService>();
 
 var app = builder.Build();
+
+// Ensure database is created (for development)
+if (app.Environment.IsDevelopment())
+{
+    using var scope = app.Services.CreateScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<FamilyFitnessDbContext>();
+    await dbContext.Database.EnsureCreatedAsync();
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
