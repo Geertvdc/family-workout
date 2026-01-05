@@ -17,7 +17,7 @@ builder.Services.AddCors(options =>
 });
 
 // Register PostgreSQL
-var connectionString = builder.Configuration.GetConnectionString("postgres") 
+var connectionString = builder.Configuration.GetConnectionString("family-fitness") 
     ?? throw new InvalidOperationException("PostgreSQL connection string not found");
 
 builder.Services.AddDbContext<FamilyFitnessDbContext>(options =>
