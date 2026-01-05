@@ -1,14 +1,15 @@
 ﻿var builder = DistributedApplication.CreateBuilder(args);
 
 // Add PostgreSQL database
-var postgres = builder.AddPostgres("postgres")
-    .WithLifetime(ContainerLifetime.Persistent)
-    .AddDatabase("family-fitness");
+var postgresServer = builder.AddPostgres("postgres")
+    .WithLifetime(ContainerLifetime.Persistent);
+
+var postgresDb = postgresServer.AddDatabase("family-fitness");
 
 // Add the API project with PostgreSQL reference
 var api = builder.AddProject("api", "../../src/FamilyFitness.Api/FamilyFitness.Api.csproj")
-    .WithReference(postgres)
-    .WaitFor(postgres);
+    .WithReference(postgresDb)
+    .WaitFor(postgresDb);
 
 // Add the Blazor project with API reference
 builder.AddProject("blazor", "../../src/FamilyFitness.Blazor/FamilyFitness.Blazor.csproj")
