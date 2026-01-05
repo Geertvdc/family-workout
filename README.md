@@ -1,6 +1,6 @@
 # FamilyFitness App
 
-A family workout tracking application built with .NET 10, Blazor, and Azure Cosmos DB.
+A family workout tracking application built with .NET 10, Blazor, and PostgreSQL.
 
 ## Architecture
 
@@ -8,21 +8,20 @@ This project follows Clean Architecture principles with the following layers:
 
 - **Domain** (`FamilyFitness.Domain`): Core business entities and domain logic
 - **Application** (`FamilyFitness.Application`): Use cases, business workflows, and repository interfaces
-- **Infrastructure** (`FamilyFitness.Infrastructure`): Technical implementations (Cosmos DB, etc.)
+- **Infrastructure** (`FamilyFitness.Infrastructure`): Technical implementations (PostgreSQL with Entity Framework Core, etc.)
 - **API** (`FamilyFitness.Api`): RESTful HTTP endpoints
 - **Blazor** (`FamilyFitness.Blazor`): User interface
 
 ## Prerequisites
 
 - .NET 10 SDK
-- **For x64 systems**: Docker (for Cosmos DB emulator when using Aspire)
-- **For ARM Macs (Apple Silicon)**: Azure Cosmos DB account (emulator not supported on ARM)
-- **For Windows**: Azure Cosmos DB Emulator
+- Docker (for PostgreSQL when using Aspire)
+- Or PostgreSQL installed locally
 - Aspire CLI (install with: `dotnet tool install -g aspire.cli`)
 
 ## Running Locally
 
-### Option 1: Using .NET Aspire (Recommended for x64 systems)
+### Option 1: Using .NET Aspire (Recommended)
 
 .NET Aspire provides integrated orchestration for the entire application stack.
 
@@ -42,54 +41,28 @@ aspire run aspire/FamilyFitness.AppHost/FamilyFitness.AppHost.csproj
 ```
 
 This will:
-- Start the Cosmos DB emulator in a Docker container
+- Start PostgreSQL in a Docker container
 - Start the API project with the correct connection string
 - Start the Blazor project with the correct API URL
 - Open the Aspire dashboard where you can monitor all services
 
-**⚠️ Important for ARM Mac Users (Apple Silicon):**
-
-The Cosmos DB emulator Docker image doesn't support ARM architecture. You have two options:
-
-**Option A: Use Azure Cosmos DB Cloud Service (Recommended)**
-1. Create a free Azure Cosmos DB account at https://portal.azure.com
-2. Use the ARM-compatible Program.cs:
-   ```bash
-   cd aspire/FamilyFitness.AppHost
-   # Backup original and use ARM template
-   cp Program.cs Program.cs.x64
-   cp Program.ARM.cs.template Program.cs
-   ```
-3. Update `src/FamilyFitness.Api/appsettings.Development.json` with your Azure Cosmos DB connection string:
-   ```json
-   {
-     "ConnectionStrings": {
-       "cosmos": "AccountEndpoint=https://YOUR-ACCOUNT.documents.azure.com:443/;AccountKey=YOUR-KEY;"
-     }
-   }
-   ```
-4. Run: `aspire run aspire/FamilyFitness.AppHost/FamilyFitness.AppHost.csproj`
-
-**Option B: Run Services Manually (without Aspire)**
-See "Option 2: Run Services Manually" below and use Azure Cosmos DB connection string.
-
-**Note**: Requires Docker to be running for x64 systems with Cosmos DB emulator.
+**Note**: Requires Docker to be running.
 
 ### Option 2: Run Services Manually
 
-If you prefer to run services individually or are on ARM Mac:
+If you prefer to run services individually:
 
 ```bash
-# For ARM Mac: Use Azure Cosmos DB cloud service
-# Configure connection string in src/FamilyFitness.Api/appsettings.Development.json
+# Start PostgreSQL with Docker:
+docker run -d \
+  --name family-fitness-postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=family_fitness \
+  -p 5432:5432 \
+  postgres:17
 
-# For x64 systems with Docker:
-docker run -d -p 8081:8081 -p 10250-10255:10250-10255 \
-  --name cosmos-emulator \
-  mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest
-
-# For Windows: Azure Cosmos DB Emulator
-# Install and start from https://aka.ms/cosmosdb-emulator
+# Or use locally installed PostgreSQL
+# Make sure a database named 'family_fitness' exists
 
 # Run the API
 cd src/FamilyFitness.Api
@@ -102,12 +75,12 @@ dotnet run
 
 ### Connection String Configuration
 
-The API expects a Cosmos DB connection string named "cosmos" in configuration. For local development with the emulator:
+The API expects a PostgreSQL connection string named "postgres" in configuration. For local development:
 
 ```json
 {
   "ConnectionStrings": {
-    "cosmos": "AccountEndpoint=https://localhost:8081/;AccountKey=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw=="
+    "postgres": "Host=localhost;Port=5432;Database=family_fitness;Username=postgres;Password=postgres"
   }
 }
 ```
@@ -166,13 +139,16 @@ The Blazor app runs on `https://localhost:7002` (or configured port) and provide
 
 ## Database Setup
 
-When using .NET Aspire, the Cosmos DB emulator is automatically configured. Otherwise, on first run you'll need to create the Cosmos DB database and container:
+When using .NET Aspire, PostgreSQL is automatically configured and the database schema is created. 
 
-1. Connect to your Cosmos DB emulator or instance
-2. Create a database named `family-fitness`
-3. Create a container named `workout-types` with partition key `/PartitionKey`
+When running manually, the API will automatically create the database schema on first run using Entity Framework Core's `EnsureCreatedAsync()` in development mode.
 
-Or use the Data Explorer in the Cosmos DB Emulator UI.
+For production environments, use EF Core migrations:
+```bash
+cd src/FamilyFitness.Api
+dotnet ef migrations add InitialCreate --project ../FamilyFitness.Infrastructure
+dotnet ef database update
+```
 
 ## Development Principles
 
@@ -181,6 +157,7 @@ Or use the Data Explorer in the Cosmos DB Emulator UI.
 - **Keep It Simple**: Don't add complexity until needed
 - **Immutable Domain Entities**: Use constructor validation and `With*` methods for updates
 - **Local Development with Aspire**: Use .NET Aspire CLI for integrated local development experience
+- **Cross-Platform**: PostgreSQL works on all platforms (Windows, macOS including ARM, Linux)
 
 ## Aspire Setup Notes
 
@@ -189,6 +166,7 @@ In .NET 10, Aspire moved from a workload to standalone NuGet packages and CLI to
 - Requires `dotnet tool install -g aspire.cli` to run
 - Use `aspire run` command instead of `dotnet run` for the AppHost
 - Dashboard and DCP (Developer Control Plane) binaries are automatically downloaded as NuGet packages
+- PostgreSQL container works on all architectures (x64 and ARM)
 
 ## Contributing
 
