@@ -168,6 +168,10 @@ public class FamilyFitnessDbContext : DbContext
             entity.ToTable("workout_session_workout_types");
             entity.HasKey(e => e.Id);
             
+            entity.Property(e => e.WorkoutTypeId)
+                .HasMaxLength(50)
+                .IsRequired();
+            
             entity.Property(e => e.StationIndex)
                 .IsRequired();
 
