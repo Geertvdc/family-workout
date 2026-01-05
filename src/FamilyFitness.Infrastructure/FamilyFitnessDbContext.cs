@@ -236,6 +236,10 @@ public class FamilyFitnessDbContext : DbContext
             entity.Property(e => e.StationIndex)
                 .IsRequired();
             
+            entity.Property(e => e.WorkoutTypeId)
+                .HasMaxLength(50)
+                .IsRequired();
+            
             entity.Property(e => e.Score)
                 .IsRequired();
             
@@ -248,6 +252,9 @@ public class FamilyFitnessDbContext : DbContext
             // Unique constraint: one score per participant per round per station
             entity.HasIndex(e => new { e.ParticipantId, e.RoundNumber, e.StationIndex })
                 .IsUnique();
+
+            // Index for querying scores by workout type for progression tracking
+            entity.HasIndex(e => new { e.ParticipantId, e.WorkoutTypeId, e.RecordedAt });
 
             // Check constraints
             entity.ToTable(t => t.HasCheckConstraint(

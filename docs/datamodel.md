@@ -173,12 +173,14 @@ Stores scores for each participant's performance at each station in each round.
 - `ParticipantId` (Guid, FK): Reference to WorkoutSessionParticipant
 - `RoundNumber` (int): Round number (1-3)
 - `StationIndex` (int): Station number (1-4)
+- `WorkoutTypeId` (string, FK): Direct reference to WorkoutType for easier progression querying
 - `Score` (int): Performance score (0 or higher)
 - `Weight` (decimal(10,2), nullable): Optional weight used
 - `RecordedAt` (DateTime): When score was recorded
 
 **Constraints:**
 - Unique (ParticipantId, RoundNumber, StationIndex): One score per participant per round per station
+- Index (ParticipantId, WorkoutTypeId, RecordedAt): Optimized for progression queries by workout type
 - Check: RoundNumber BETWEEN 1 AND 3
 - Check: StationIndex BETWEEN 1 AND 4
 - Check: Score >= 0 (zero is allowed for no reps or cancelled sessions)
@@ -222,6 +224,31 @@ For example, with 4 participants and 4 stations:
 - Round 1: P1→S1, P2→S2, P3→S3, P4→S4
 - Round 2: P1→S2, P2→S3, P3→S4, P4→S1
 - Round 3: P1→S3, P2→S4, P3→S1, P4→S2
+
+### Progression Tracking
+
+The `WorkoutIntervalScore` entity includes both `StationIndex` (for rotation logic) and `WorkoutTypeId` (for progression queries). This design enables:
+
+**Easy progression queries** - Find all scores for a specific exercise type:
+```sql
+SELECT Score, Weight, RecordedAt 
+FROM workout_interval_scores 
+WHERE ParticipantId = @userId 
+  AND WorkoutTypeId = 'pushups'
+ORDER BY RecordedAt;
+```
+
+**Performance over time** - Track improvement without complex joins:
+```sql
+SELECT DATE(RecordedAt) as Date, AVG(Score) as AvgScore
+FROM workout_interval_scores 
+WHERE ParticipantId = @userId 
+  AND WorkoutTypeId = 'pushups'
+GROUP BY DATE(RecordedAt)
+ORDER BY Date;
+```
+
+The index on `(ParticipantId, WorkoutTypeId, RecordedAt)` optimizes these queries for fast performance.
 
 ## Database Schema
 

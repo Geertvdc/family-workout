@@ -85,12 +85,14 @@ public class WorkoutDataModelTests
             ParticipantId = Guid.NewGuid(),
             RoundNumber = 1,
             StationIndex = 1,
+            WorkoutTypeId = "pushups",
             Score = 0, // Zero is valid
             RecordedAt = DateTime.UtcNow
         };
 
         // Assert
         Assert.Equal(0, score.Score);
+        Assert.Equal("pushups", score.WorkoutTypeId);
     }
 
     [Fact]
@@ -121,6 +123,7 @@ public class WorkoutDataModelTests
             Id = Guid.NewGuid(),
             ParticipantId = Guid.NewGuid(),
             StationIndex = 1,
+            WorkoutTypeId = "situps",
             Score = 10,
             RecordedAt = DateTime.UtcNow
         };
@@ -162,5 +165,40 @@ public class WorkoutDataModelTests
         Assert.Equal(1, (int)WorkoutSessionStatus.Active);
         Assert.Equal(2, (int)WorkoutSessionStatus.Completed);
         Assert.Equal(3, (int)WorkoutSessionStatus.Cancelled);
+    }
+
+    [Fact]
+    public void WorkoutIntervalScore_IncludesWorkoutTypeId_ForProgressionTracking()
+    {
+        // Arrange
+        var participantId = Guid.NewGuid();
+        var pushupScores = new List<WorkoutIntervalScore>();
+
+        // Act - Create multiple scores for the same workout type
+        for (int round = 1; round <= 3; round++)
+        {
+            var score = new WorkoutIntervalScore
+            {
+                Id = Guid.NewGuid(),
+                ParticipantId = participantId,
+                RoundNumber = round,
+                StationIndex = round, // Different stations due to rotation
+                WorkoutTypeId = "pushups", // Same workout type
+                Score = 10 + round * 5,
+                RecordedAt = DateTime.UtcNow.AddMinutes(round * 5)
+            };
+            pushupScores.Add(score);
+        }
+
+        // Assert - Can easily filter scores by workout type
+        var allPushupScores = pushupScores.Where(s => s.WorkoutTypeId == "pushups").ToList();
+        Assert.Equal(3, allPushupScores.Count);
+        Assert.All(allPushupScores, s => Assert.Equal("pushups", s.WorkoutTypeId));
+        Assert.All(allPushupScores, s => Assert.Equal(participantId, s.ParticipantId));
+        
+        // Can track progression over rounds
+        Assert.Equal(15, allPushupScores[0].Score);
+        Assert.Equal(20, allPushupScores[1].Score);
+        Assert.Equal(25, allPushupScores[2].Score);
     }
 }
