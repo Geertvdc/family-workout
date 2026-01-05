@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FamilyFitness.Infrastructure.Migrations
 {
     [DbContext(typeof(FamilyFitnessDbContext))]
-    [Migration("20260105183325_InitialWorkoutDataModel")]
+    [Migration("20260105183912_InitialWorkoutDataModel")]
     partial class InitialWorkoutDataModel
     {
         /// <inheritdoc />
@@ -235,7 +235,8 @@ namespace FamilyFitness.Infrastructure.Migrations
 
                     b.Property<string>("WorkoutTypeId")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.HasKey("Id");
 

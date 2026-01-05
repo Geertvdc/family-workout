@@ -232,7 +232,8 @@ namespace FamilyFitness.Infrastructure.Migrations
 
                     b.Property<string>("WorkoutTypeId")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.HasKey("Id");
 

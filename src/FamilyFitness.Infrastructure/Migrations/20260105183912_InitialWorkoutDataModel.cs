@@ -142,7 +142,7 @@ namespace FamilyFitness.Infrastructure.Migrations
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     WorkoutSessionId = table.Column<Guid>(type: "uuid", nullable: false),
-                    WorkoutTypeId = table.Column<string>(type: "text", nullable: false),
+                    WorkoutTypeId = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
                     StationIndex = table.Column<int>(type: "integer", nullable: false)
                 },
                 constraints: table =>
