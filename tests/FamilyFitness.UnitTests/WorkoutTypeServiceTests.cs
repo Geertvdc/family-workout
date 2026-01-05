@@ -14,9 +14,7 @@ public class WorkoutTypeServiceTests
         var service = new WorkoutTypeService(repository, idGenerator);
         var command = new CreateWorkoutTypeCommand(
             "Push-ups",
-            "Upper body exercise",
-            10,
-            Intensity.Moderate
+            "Upper body exercise"
         );
 
         // Act
@@ -26,8 +24,6 @@ public class WorkoutTypeServiceTests
         Assert.Equal("test-id", result.Id);
         Assert.Equal("Push-ups", result.Name);
         Assert.Equal("Upper body exercise", result.Description);
-        Assert.Equal(10, result.EstimatedDurationMinutes);
-        Assert.Equal("Moderate", result.Intensity);
     }
 
     [Fact]
@@ -38,17 +34,13 @@ public class WorkoutTypeServiceTests
         await repository.AddAsync(new WorkoutType(
             "id1",
             "Push-ups",
-            null,
-            null,
-            Intensity.Moderate
+            null
         ));
 
         var service = new WorkoutTypeService(repository, new FixedIdGenerator("id2"));
         var command = new CreateWorkoutTypeCommand(
             "push-ups", // Different case
-            null,
-            null,
-            Intensity.Moderate
+            null
         );
 
         // Act & Assert
@@ -67,9 +59,7 @@ public class WorkoutTypeServiceTests
         var command = new UpdateWorkoutTypeCommand(
             "non-existing-id",
             "Some Name",
-            null,
-            null,
-            Intensity.Light
+            null
         );
 
         // Act & Assert
@@ -84,8 +74,8 @@ public class WorkoutTypeServiceTests
     {
         // Arrange
         var repository = new InMemoryWorkoutTypeRepository();
-        await repository.AddAsync(new WorkoutType("id1", "Push-ups", null, null, Intensity.Moderate));
-        await repository.AddAsync(new WorkoutType("id2", "Squats", null, 15, Intensity.Intense));
+        await repository.AddAsync(new WorkoutType("id1", "Push-ups", null));
+        await repository.AddAsync(new WorkoutType("id2", "Squats", "Leg exercise"));
 
         var service = new WorkoutTypeService(repository, new FixedIdGenerator("id3"));
 
@@ -103,7 +93,7 @@ public class WorkoutTypeServiceTests
     {
         // Arrange
         var repository = new InMemoryWorkoutTypeRepository();
-        await repository.AddAsync(new WorkoutType("id1", "Push-ups", "Description", 10, Intensity.Moderate));
+        await repository.AddAsync(new WorkoutType("id1", "Push-ups", "Description"));
 
         var service = new WorkoutTypeService(repository, new FixedIdGenerator("id2"));
 
@@ -133,7 +123,7 @@ public class WorkoutTypeServiceTests
     {
         // Arrange
         var repository = new InMemoryWorkoutTypeRepository();
-        await repository.AddAsync(new WorkoutType("id1", "Push-ups", null, null, Intensity.Moderate));
+        await repository.AddAsync(new WorkoutType("id1", "Push-ups", null));
 
         var service = new WorkoutTypeService(repository, new FixedIdGenerator("id2"));
 
@@ -163,15 +153,13 @@ public class WorkoutTypeServiceTests
     {
         // Arrange
         var repository = new InMemoryWorkoutTypeRepository();
-        await repository.AddAsync(new WorkoutType("id1", "Push-ups", "Old desc", 10, Intensity.Moderate));
+        await repository.AddAsync(new WorkoutType("id1", "Push-ups", "Old desc"));
 
         var service = new WorkoutTypeService(repository, new FixedIdGenerator("id2"));
         var command = new UpdateWorkoutTypeCommand(
             "id1",
             "Modified Push-ups",
-            "New description",
-            15,
-            Intensity.Intense
+            "New description"
         );
 
         // Act
@@ -181,8 +169,6 @@ public class WorkoutTypeServiceTests
         Assert.Equal("id1", result.Id);
         Assert.Equal("Modified Push-ups", result.Name);
         Assert.Equal("New description", result.Description);
-        Assert.Equal(15, result.EstimatedDurationMinutes);
-        Assert.Equal("Intense", result.Intensity);
     }
 
     [Fact]
@@ -190,16 +176,14 @@ public class WorkoutTypeServiceTests
     {
         // Arrange
         var repository = new InMemoryWorkoutTypeRepository();
-        await repository.AddAsync(new WorkoutType("id1", "Push-ups", null, null, Intensity.Moderate));
-        await repository.AddAsync(new WorkoutType("id2", "Squats", null, null, Intensity.Moderate));
+        await repository.AddAsync(new WorkoutType("id1", "Push-ups", null));
+        await repository.AddAsync(new WorkoutType("id2", "Squats", null));
 
         var service = new WorkoutTypeService(repository, new FixedIdGenerator("id3"));
         var command = new UpdateWorkoutTypeCommand(
             "id2",
             "Push-ups", // Name already used by id1
-            null,
-            null,
-            Intensity.Moderate
+            null
         );
 
         // Act & Assert
@@ -214,15 +198,13 @@ public class WorkoutTypeServiceTests
     {
         // Arrange
         var repository = new InMemoryWorkoutTypeRepository();
-        await repository.AddAsync(new WorkoutType("id1", "Push-ups", "Old desc", 10, Intensity.Moderate));
+        await repository.AddAsync(new WorkoutType("id1", "Push-ups", "Old desc"));
 
         var service = new WorkoutTypeService(repository, new FixedIdGenerator("id2"));
         var command = new UpdateWorkoutTypeCommand(
             "id1",
             "Push-ups", // Same name, same id - should be allowed
-            "New description",
-            15,
-            Intensity.Intense
+            "New description"
         );
 
         // Act

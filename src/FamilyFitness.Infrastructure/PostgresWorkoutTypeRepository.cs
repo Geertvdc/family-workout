@@ -54,9 +54,7 @@ public class PostgresWorkoutTypeRepository : IWorkoutTypeRepository
         return new WorkoutType(
             dbEntity.Id,
             dbEntity.Name,
-            dbEntity.Description,
-            dbEntity.EstimatedDurationMinutes,
-            Enum.Parse<Intensity>(dbEntity.Intensity)
+            dbEntity.Description
         );
     }
 
@@ -66,9 +64,7 @@ public class PostgresWorkoutTypeRepository : IWorkoutTypeRepository
         {
             Id = entity.Id,
             Name = entity.Name,
-            Description = entity.Description,
-            EstimatedDurationMinutes = entity.EstimatedDurationMinutes,
-            Intensity = entity.Intensity.ToString()
+            Description = entity.Description
         };
     }
 }

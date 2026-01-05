@@ -27,18 +27,6 @@
                 <label class="form-label">Description</label>
                 <InputTextArea class="form-control" @bind-Value="newWorkoutType.Description" rows="3" />
             </div>
-            <div class="mb-3">
-                <label class="form-label">Estimated Duration (minutes)</label>
-                <InputNumber class="form-control" @bind-Value="newWorkoutType.EstimatedDurationMinutes" />
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Intensity *</label>
-                <InputSelect class="form-control" @bind-Value="newWorkoutType.Intensity">
-                    <option value="Light">Light</option>
-                    <option value="Moderate">Moderate</option>
-                    <option value="Intense">Intense</option>
-                </InputSelect>
-            </div>
             <button type="submit" class="btn btn-primary" disabled="@isCreating">
                 @if (isCreating)
                 {
@@ -70,8 +58,6 @@ else
             <tr>
                 <th>Name</th>
                 <th>Description</th>
-                <th>Duration (min)</th>
-                <th>Intensity</th>
                 <th>Actions</th>
             </tr>
         </thead>
@@ -81,12 +67,6 @@ else
                 <tr>
                     <td>@workoutType.Name</td>
                     <td>@(workoutType.Description ?? "-")</td>
-                    <td>@(workoutType.EstimatedDurationMinutes?.ToString() ?? "-")</td>
-                    <td>
-                        <span class="badge bg-@GetIntensityColor(workoutType.Intensity)">
-                            @workoutType.Intensity
-                        </span>
-                    </td>
                     <td>
                         <button class="btn btn-sm btn-danger" @onclick="() => DeleteWorkoutType(workoutType.Id)">
                             Delete
@@ -181,32 +161,17 @@ else
         }
     }
 
-    private string GetIntensityColor(string intensity)
-    {
-        return intensity switch
-        {
-            "Light" => "success",
-            "Moderate" => "warning",
-            "Intense" => "danger",
-            _ => "secondary"
-        };
-    }
-
     public class WorkoutTypeDto
     {
         public string Id { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
         public string? Description { get; set; }
-        public int? EstimatedDurationMinutes { get; set; }
-        public string Intensity { get; set; } = string.Empty;
     }
 
     public class CreateWorkoutTypeModel
     {
         public string Name { get; set; } = string.Empty;
         public string? Description { get; set; }
-        public int? EstimatedDurationMinutes { get; set; }
-        public string Intensity { get; set; } = "Moderate";
     }
 
     public class ErrorResponse
