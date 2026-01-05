@@ -34,7 +34,24 @@ if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<FamilyFitnessDbContext>();
-    await dbContext.Database.EnsureCreatedAsync();
+    
+    // Retry logic to wait for PostgreSQL to be ready
+    var maxRetries = 30;
+    var delay = TimeSpan.FromSeconds(2);
+    
+    for (int i = 0; i < maxRetries; i++)
+    {
+        try
+        {
+            await dbContext.Database.EnsureCreatedAsync();
+            break;
+        }
+        catch (Npgsql.NpgsqlException) when (i < maxRetries - 1)
+        {
+            app.Logger.LogInformation("Waiting for PostgreSQL to be ready... (Attempt {Attempt}/{MaxRetries})", i + 1, maxRetries);
+            await Task.Delay(delay);
+        }
+    }
 }
 
 // Configure the HTTP request pipeline.

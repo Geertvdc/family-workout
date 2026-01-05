@@ -7,7 +7,8 @@ var postgres = builder.AddPostgres("postgres")
 
 // Add the API project with PostgreSQL reference
 var api = builder.AddProject("api", "../../src/FamilyFitness.Api/FamilyFitness.Api.csproj")
-    .WithReference(postgres);
+    .WithReference(postgres)
+    .WaitFor(postgres);
 
 // Add the Blazor project with API reference
 builder.AddProject("blazor", "../../src/FamilyFitness.Blazor/FamilyFitness.Blazor.csproj")
