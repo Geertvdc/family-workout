@@ -27,9 +27,7 @@ public class WorkoutTypeService
         var workoutType = new WorkoutType(
             id,
             command.Name,
-            command.Description,
-            command.EstimatedDurationMinutes,
-            command.Intensity
+            command.Description
         );
 
         await _repository.AddAsync(workoutType);
@@ -73,9 +71,7 @@ public class WorkoutTypeService
         // Update entity
         var updated = existing.WithUpdatedDetails(
             command.Name,
-            command.Description,
-            command.EstimatedDurationMinutes,
-            command.Intensity
+            command.Description
         );
 
         await _repository.UpdateAsync(updated);
@@ -99,9 +95,7 @@ public class WorkoutTypeService
         return new WorkoutTypeDto(
             workoutType.Id,
             workoutType.Name,
-            workoutType.Description,
-            workoutType.EstimatedDurationMinutes,
-            workoutType.Intensity.ToString()
+            workoutType.Description
         );
     }
 }

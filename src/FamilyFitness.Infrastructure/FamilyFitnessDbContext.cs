@@ -29,12 +29,6 @@ public class FamilyFitnessDbContext : DbContext
             
             entity.Property(e => e.Description)
                 .HasMaxLength(1000);
-            
-            entity.Property(e => e.EstimatedDurationMinutes);
-            
-            entity.Property(e => e.Intensity)
-                .HasMaxLength(50)
-                .IsRequired();
 
             entity.HasIndex(e => e.Name)
                 .IsUnique();
@@ -47,6 +41,4 @@ public class WorkoutTypeEntity
     public string Id { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
-    public int? EstimatedDurationMinutes { get; set; }
-    public string Intensity { get; set; } = string.Empty;
 }
