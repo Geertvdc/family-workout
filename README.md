@@ -123,19 +123,50 @@ dotnet test tests/FamilyFitness.UnitTests/FamilyFitness.UnitTests.csproj
 
 ## API Endpoints
 
-The API runs on `https://localhost:7001` (or configured port) and provides:
+The API runs on `https://localhost:7001` (or configured port) and provides complete CRUD operations for all domain entities:
 
-- `GET /api/workout-types` - List all workout types
-- `GET /api/workout-types/{id}` - Get a specific workout type
-- `POST /api/workout-types` - Create a new workout type
-- `PUT /api/workout-types/{id}` - Update a workout type
-- `DELETE /api/workout-types/{id}` - Delete a workout type
+### Core Entities
+- **Users** - `/api/users` - User management (username, email)
+- **Groups** - `/api/groups` - Group/family management
+- **Group Memberships** - `/api/group-memberships` - User-to-group relationships with roles
+
+### Workout Management
+- **Workout Types** - `/api/workout-types` - Exercise type definitions (e.g., Pushups, Situps)
+- **Workout Sessions** - `/api/workout-sessions` - Scheduled workout events
+- **Session Workout Types** - `/api/workout-session-workout-types` - 4 stations per session
+- **Session Participants** - `/api/workout-session-participants` - User participation tracking
+- **Interval Scores** - `/api/workout-interval-scores` - Performance scores (3 rounds × 4 stations)
+
+### API Features
+- Full CRUD operations (Create, Read, Update, Delete)
+- Nested endpoints for related data (e.g., `/api/groups/{id}/memberships`)
+- Consistent error handling with descriptive messages
+- Input validation at service layer
+- **Note**: No authentication required (will be added in future iteration)
+
+For complete API documentation, see [docs/api-endpoints.md](docs/api-endpoints.md).
 
 ## Blazor UI
 
-The Blazor app runs on `https://localhost:7002` (or configured port) and provides:
+The Blazor app runs on `https://localhost:7002` (or configured port) and provides simple CRUD interfaces for testing:
 
-- `/workout-types` - Manage workout types (list, create, delete)
+### Available Pages
+- `/users` - User management
+- `/groups` - Group management
+- `/group-memberships` - Manage user-group relationships
+- `/workout-types` - Manage workout/exercise types
+- `/workout-sessions` - Create and manage workout sessions
+- `/workout-session-workout-types` - Assign exercises to session stations
+- `/workout-session-participants` - Add participants to sessions
+- `/workout-interval-scores` - Record performance scores
+
+All pages follow a consistent pattern:
+- Create new entities with forms
+- View all entities in tables
+- Delete entities with confirmation
+- Real-time feedback for operations
+
+**Note**: The UI is intentionally simple for testing purposes. UI polish and user experience improvements will be added in future iterations.
 
 ## Database Setup
 
