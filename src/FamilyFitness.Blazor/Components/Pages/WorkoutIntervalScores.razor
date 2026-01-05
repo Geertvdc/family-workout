@@ -1,0 +1,228 @@
+@page "/workout-interval-scores"
+@using System.Net.Http.Json
+@inject HttpClient Http
+@rendermode InteractiveServer
+
+<h3>Workout Interval Scores</h3>
+
+@if (errorMessage != null)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+@if (successMessage != null)
+{
+    <div class="alert alert-success">@successMessage</div>
+}
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <h4>Create New Score</h4>
+        <EditForm Model="@newScore" OnValidSubmit="@CreateScore">
+            <div class="mb-3">
+                <label class="form-label">Participant ID *</label>
+                <InputText class="form-control" @bind-Value="newScore.ParticipantId" required />
+                <small class="text-muted">Enter WorkoutSessionParticipant GUID</small>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Round Number (1-3) *</label>
+                <InputNumber class="form-control" @bind-Value="newScore.RoundNumber" required />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Station Index (1-4) *</label>
+                <InputNumber class="form-control" @bind-Value="newScore.StationIndex" required />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Workout Type ID *</label>
+                <InputText class="form-control" @bind-Value="newScore.WorkoutTypeId" required />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Score *</label>
+                <InputNumber class="form-control" @bind-Value="newScore.Score" required />
+                <small class="text-muted">Number of reps (0 or higher)</small>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Weight (optional)</label>
+                <InputNumber class="form-control" @bind-Value="newScore.Weight" />
+            </div>
+            <button type="submit" class="btn btn-primary" disabled="@isCreating">
+                @if (isCreating)
+                {
+                    <span>Creating...</span>
+                }
+                else
+                {
+                    <span>Create</span>
+                }
+            </button>
+        </EditForm>
+    </div>
+</div>
+
+<h4>All Workout Interval Scores</h4>
+
+@if (scores == null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (!scores.Any())
+{
+    <p><em>No workout interval scores found. Create one above to get started!</em></p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Participant ID</th>
+                <th>Round</th>
+                <th>Station</th>
+                <th>Workout Type</th>
+                <th>Score</th>
+                <th>Weight</th>
+                <th>Recorded At</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var score in scores)
+            {
+                <tr>
+                    <td><small>@score.ParticipantId</small></td>
+                    <td>@score.RoundNumber</td>
+                    <td>@score.StationIndex</td>
+                    <td>@score.WorkoutTypeId</td>
+                    <td><strong>@score.Score</strong></td>
+                    <td>@(score.Weight?.ToString("F2") ?? "-")</td>
+                    <td>@score.RecordedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                    <td>
+                        <button class="btn btn-sm btn-danger" @onclick="() => DeleteScore(score.Id)">
+                            Delete
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<WorkoutIntervalScoreDto>? scores;
+    private CreateWorkoutIntervalScoreModel newScore = new();
+    private bool isCreating = false;
+    private string? errorMessage;
+    private string? successMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadScores();
+    }
+
+    private async Task LoadScores()
+    {
+        try
+        {
+            errorMessage = null;
+            scores = await Http.GetFromJsonAsync<List<WorkoutIntervalScoreDto>>("/api/workout-interval-scores");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load workout interval scores: {ex.Message}";
+        }
+    }
+
+    private async Task CreateScore()
+    {
+        try
+        {
+            isCreating = true;
+            errorMessage = null;
+            successMessage = null;
+
+            var command = new
+            {
+                ParticipantId = Guid.Parse(newScore.ParticipantId),
+                RoundNumber = newScore.RoundNumber,
+                StationIndex = newScore.StationIndex,
+                WorkoutTypeId = newScore.WorkoutTypeId,
+                Score = newScore.Score,
+                Weight = newScore.Weight
+            };
+
+            var response = await Http.PostAsJsonAsync("/api/workout-interval-scores", command);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                successMessage = "Workout interval score created successfully!";
+                newScore = new CreateWorkoutIntervalScoreModel();
+                await LoadScores();
+            }
+            else
+            {
+                var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+                errorMessage = error?.error ?? "Failed to create workout interval score";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isCreating = false;
+        }
+    }
+
+    private async Task DeleteScore(Guid id)
+    {
+        try
+        {
+            errorMessage = null;
+            successMessage = null;
+
+            var response = await Http.DeleteAsync($"/api/workout-interval-scores/{id}");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                successMessage = "Workout interval score deleted successfully!";
+                await LoadScores();
+            }
+            else
+            {
+                var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+                errorMessage = error?.error ?? "Failed to delete workout interval score";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    public class WorkoutIntervalScoreDto
+    {
+        public Guid Id { get; set; }
+        public Guid ParticipantId { get; set; }
+        public int RoundNumber { get; set; }
+        public int StationIndex { get; set; }
+        public string WorkoutTypeId { get; set; } = string.Empty;
+        public int Score { get; set; }
+        public decimal? Weight { get; set; }
+        public DateTime RecordedAt { get; set; }
+    }
+
+    public class CreateWorkoutIntervalScoreModel
+    {
+        public string ParticipantId { get; set; } = string.Empty;
+        public int RoundNumber { get; set; } = 1;
+        public int StationIndex { get; set; } = 1;
+        public string WorkoutTypeId { get; set; } = string.Empty;
+        public int Score { get; set; } = 0;
+        public decimal? Weight { get; set; }
+    }
+
+    public class ErrorResponse
+    {
+        public string error { get; set; } = string.Empty;
+    }
+}
