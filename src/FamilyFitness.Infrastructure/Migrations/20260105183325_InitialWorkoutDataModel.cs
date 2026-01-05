@@ -165,6 +165,7 @@ namespace FamilyFitness.Infrastructure.Migrations
                     ParticipantId = table.Column<Guid>(type: "uuid", nullable: false),
                     RoundNumber = table.Column<int>(type: "integer", nullable: false),
                     StationIndex = table.Column<int>(type: "integer", nullable: false),
+                    WorkoutTypeId = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
                     Score = table.Column<int>(type: "integer", nullable: false),
                     Weight = table.Column<decimal>(type: "numeric(10,2)", precision: 10, scale: 2, nullable: true),
                     RecordedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
@@ -211,6 +212,11 @@ namespace FamilyFitness.Infrastructure.Migrations
                 table: "workout_interval_scores",
                 columns: new[] { "ParticipantId", "RoundNumber", "StationIndex" },
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_workout_interval_scores_ParticipantId_WorkoutTypeId_Recorde~",
+                table: "workout_interval_scores",
+                columns: new[] { "ParticipantId", "WorkoutTypeId", "RecordedAt" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_workout_session_participants_UserId",
