@@ -110,7 +110,10 @@ public class WorkoutIntervalScoreService
             throw new ArgumentException("Score must be 0 or greater.", nameof(command.Score));
         }
 
-        // Update score (note: in production, scores might be immutable, but for CRUD testing we allow updates)
+        // Update score
+        // Note: Per data model spec, scores should be immutable in production to maintain data integrity.
+        // This update method is provided for testing and initial data correction purposes only.
+        // Consider enforcing immutability at the database level with triggers or removing this method in production.
         existing.Score = command.Score;
         existing.Weight = command.Weight;
 
