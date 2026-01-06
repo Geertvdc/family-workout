@@ -40,7 +40,9 @@ public class WorkoutSessionService
             Id = Guid.NewGuid(),
             GroupId = command.GroupId,
             CreatorId = command.CreatorId,
-            SessionDate = command.SessionDate,
+            SessionDate = command.SessionDate.Kind == DateTimeKind.Utc 
+                ? command.SessionDate 
+                : DateTime.SpecifyKind(command.SessionDate, DateTimeKind.Utc),
             Status = WorkoutSessionStatus.Pending,
             CreatedAt = DateTime.UtcNow
         };
@@ -89,9 +91,19 @@ public class WorkoutSessionService
         }
 
         // Update session
-        existing.SessionDate = command.SessionDate;
-        existing.StartedAt = command.StartedAt;
-        existing.EndedAt = command.EndedAt;
+        existing.SessionDate = command.SessionDate.Kind == DateTimeKind.Utc 
+            ? command.SessionDate 
+            : DateTime.SpecifyKind(command.SessionDate, DateTimeKind.Utc);
+        existing.StartedAt = command.StartedAt.HasValue 
+            ? (command.StartedAt.Value.Kind == DateTimeKind.Utc 
+                ? command.StartedAt 
+                : DateTime.SpecifyKind(command.StartedAt.Value, DateTimeKind.Utc))
+            : null;
+        existing.EndedAt = command.EndedAt.HasValue 
+            ? (command.EndedAt.Value.Kind == DateTimeKind.Utc 
+                ? command.EndedAt 
+                : DateTime.SpecifyKind(command.EndedAt.Value, DateTimeKind.Utc))
+            : null;
         existing.Status = command.Status;
 
         await _repository.UpdateAsync(existing);
