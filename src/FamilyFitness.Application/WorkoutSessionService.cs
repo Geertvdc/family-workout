@@ -4,6 +4,10 @@ namespace FamilyFitness.Application;
 
 public class WorkoutSessionService
 {
+    // WOD Configuration Constants
+    private const int TotalRounds = 3;
+    private const int StationsPerRound = 4;
+
     private readonly IWorkoutSessionRepository _repository;
     private readonly IGroupRepository _groupRepository;
     private readonly IUserRepository _userRepository;
@@ -258,8 +262,8 @@ public class WorkoutSessionService
         {
             var existingScores = await _scoreRepository.GetByParticipantIdAsync(participant.Id);
             
-            // For each round (1-3) and each station (1-4)
-            for (int round = 1; round <= 3; round++)
+            // For each round and each station
+            for (int round = 1; round <= TotalRounds; round++)
             {
                 foreach (var station in stations)
                 {

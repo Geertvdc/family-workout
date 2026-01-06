@@ -116,6 +116,13 @@
     [Parameter]
     public Guid SessionId { get; set; }
 
+    // WOD Configuration Constants
+    private const int ReadyCountdownSeconds = 5;
+    private const int WorkIntervalSeconds = 60;
+    private const int CooldownMinimumSeconds = 15;
+    private const int TotalRounds = 3;
+    private const int StationsPerRound = 4;
+
     private SessionDto? session;
     private SessionAssignmentDto? assignments;
     private string? error;
@@ -123,7 +130,7 @@
 
     // Timer state
     private TimerPhase currentPhase = TimerPhase.Ready;
-    private int timeRemaining = 5;
+    private int timeRemaining = ReadyCountdownSeconds;
     private int currentRound = 1;
     private int currentStation = 1;
     private bool cooldownComplete = false;
@@ -182,12 +189,12 @@
                 if (currentPhase == TimerPhase.Ready)
                 {
                     currentPhase = TimerPhase.Work;
-                    timeRemaining = 60;
+                    timeRemaining = WorkIntervalSeconds;
                 }
                 else if (currentPhase == TimerPhase.Work)
                 {
                     currentPhase = TimerPhase.Cooldown;
-                    timeRemaining = 15;
+                    timeRemaining = CooldownMinimumSeconds;
                     cooldownComplete = false;
                     scoresEntered = false;
                 }
@@ -213,12 +220,12 @@
 
         // Advance to next station/round
         currentStation++;
-        if (currentStation > 4)
+        if (currentStation > StationsPerRound)
         {
             currentStation = 1;
             currentRound++;
             
-            if (currentRound > 3)
+            if (currentRound > TotalRounds)
             {
                 // Workout complete
                 await CompleteWorkout();
@@ -228,7 +235,7 @@
 
         // Start next interval
         currentPhase = TimerPhase.Ready;
-        timeRemaining = 5;
+        timeRemaining = ReadyCountdownSeconds;
     }
 
     private void HandleScoresSaved()
