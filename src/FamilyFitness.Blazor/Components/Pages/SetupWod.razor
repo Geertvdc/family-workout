@@ -278,7 +278,8 @@
             var sessionResponse = await Http.PostAsJsonAsync("/api/workout-sessions", createSessionCommand);
             if (!sessionResponse.IsSuccessStatusCode)
             {
-                error = "Failed to create workout session";
+                var errorContent = await sessionResponse.Content.ReadAsStringAsync();
+                error = $"Failed to create workout session: {sessionResponse.StatusCode} - {errorContent}";
                 creating = false;
                 return;
             }

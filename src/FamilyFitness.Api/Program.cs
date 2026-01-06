@@ -61,6 +61,10 @@ if (app.Environment.IsDevelopment())
         try
         {
             await dbContext.Database.EnsureCreatedAsync();
+            
+            // Seed the database with sample data
+            await DatabaseSeeder.SeedAsync(dbContext);
+            
             break;
         }
         catch (Npgsql.NpgsqlException) when (i < maxRetries - 1)
