@@ -8,6 +8,7 @@ public interface IWorkoutSessionRepository
     Task<IReadOnlyList<WorkoutSession>> GetAllAsync();
     Task<IReadOnlyList<WorkoutSession>> GetByGroupIdAsync(Guid groupId);
     Task<IReadOnlyList<WorkoutSession>> GetByCreatorIdAsync(Guid creatorId);
+    Task<WorkoutSession?> GetActiveSessionByGroupIdAsync(Guid groupId);
     Task AddAsync(WorkoutSession session);
     Task UpdateAsync(WorkoutSession session);
     Task DeleteAsync(Guid id);
