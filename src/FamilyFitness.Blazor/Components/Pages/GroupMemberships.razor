@@ -20,14 +20,30 @@
         <h4>Create New Group Membership</h4>
         <EditForm Model="@newMembership" OnValidSubmit="@CreateMembership">
             <div class="mb-3">
-                <label class="form-label">Group ID *</label>
-                <InputText class="form-control" @bind-Value="newMembership.GroupId" required />
-                <small class="text-muted">Enter Group GUID</small>
+                <label class="form-label">Group *</label>
+                <InputSelect class="form-control" @bind-Value="newMembership.GroupId" required>
+                    <option value="">-- Select a Group --</option>
+                    @if (groups != null)
+                    {
+                        @foreach (var group in groups)
+                        {
+                            <option value="@group.Id">@group.Name</option>
+                        }
+                    }
+                </InputSelect>
             </div>
             <div class="mb-3">
-                <label class="form-label">User ID *</label>
-                <InputText class="form-control" @bind-Value="newMembership.UserId" required />
-                <small class="text-muted">Enter User GUID</small>
+                <label class="form-label">User *</label>
+                <InputSelect class="form-control" @bind-Value="newMembership.UserId" required>
+                    <option value="">-- Select a User --</option>
+                    @if (users != null)
+                    {
+                        @foreach (var user in users)
+                        {
+                            <option value="@user.Id">@user.Username (@user.Email)</option>
+                        }
+                    }
+                </InputSelect>
             </div>
             <div class="mb-3">
                 <label class="form-label">Role</label>
@@ -91,6 +107,8 @@ else
 
 @code {
     private List<GroupMembershipDto>? memberships;
+    private List<GroupDto>? groups;
+    private List<UserDto>? users;
     private CreateGroupMembershipModel newMembership = new();
     private bool isCreating = false;
     private string? errorMessage;
@@ -99,6 +117,8 @@ else
     protected override async Task OnInitializedAsync()
     {
         await LoadMemberships();
+        await LoadGroups();
+        await LoadUsers();
     }
 
     private async Task LoadMemberships()
@@ -111,6 +131,30 @@ else
         catch (Exception ex)
         {
             errorMessage = $"Failed to load group memberships: {ex.Message}";
+        }
+    }
+
+    private async Task LoadGroups()
+    {
+        try
+        {
+            groups = await Http.GetFromJsonAsync<List<GroupDto>>("/api/groups");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load groups: {ex.Message}";
+        }
+    }
+
+    private async Task LoadUsers()
+    {
+        try
+        {
+            users = await Http.GetFromJsonAsync<List<UserDto>>("/api/users");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load users: {ex.Message}";
         }
     }
 
@@ -193,6 +237,22 @@ else
         public string GroupId { get; set; } = string.Empty;
         public string UserId { get; set; } = string.Empty;
         public string? Role { get; set; }
+    }
+
+    public class GroupDto
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public DateTime CreatedAt { get; set; }
+    }
+
+    public class UserDto
+    {
+        public Guid Id { get; set; }
+        public string Username { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
     }
 
     public class ErrorResponse
