@@ -1,0 +1,72 @@
+@using FamilyFitness.Blazor.Models
+
+<div class="station-assignments">
+    <h3>@Title</h3>
+    
+    @if (Participants != null && Stations != null)
+    {
+        <div class="assignments-grid">
+            @foreach (var participant in GetParticipantsAtStation())
+            {
+                var station = GetStationForParticipant(participant);
+                if (station != null)
+                {
+                    <div class="assignment-card">
+                        <div class="participant-name">@participant.UserName</div>
+                        <div class="station-info">
+                            <div class="station-number">Station @station.StationIndex</div>
+                            <div class="workout-name">@station.WorkoutTypeName</div>
+                            @if (!string.IsNullOrEmpty(station.WorkoutTypeDescription))
+                            {
+                                <div class="workout-description">@station.WorkoutTypeDescription</div>
+                            }
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public List<ParticipantDto>? Participants { get; set; }
+
+    [Parameter]
+    public List<StationDto>? Stations { get; set; }
+
+    [Parameter]
+    public int CurrentRound { get; set; }
+
+    [Parameter]
+    public int CurrentStation { get; set; }
+
+    [Parameter]
+    public string Title { get; set; } = "Stations";
+
+    private List<ParticipantDto> GetParticipantsAtStation()
+    {
+        if (Participants == null) return new();
+        return Participants.OrderBy(p => p.ParticipantIndex).ToList();
+    }
+
+    private StationDto? GetStationForParticipant(ParticipantDto participant)
+    {
+        if (Stations == null || Participants == null) return null;
+
+        // Calculate which station this participant is at based on round and participant index
+        // Station rotation: participant moves to next station each round
+        var participantCount = Participants.Count;
+        var stationCount = Stations.Count;
+
+        // Starting station for this participant (based on their index)
+        var baseStationIndex = ((participant.ParticipantIndex - 1) % stationCount) + 1;
+        
+        // Current station after rounds and station progression
+        // Each participant moves to next station after each interval
+        var intervalsCompleted = ((CurrentRound - 1) * stationCount) + (CurrentStation - 1);
+        var currentStationIndex = ((baseStationIndex - 1 + intervalsCompleted) % stationCount) + 1;
+
+        return Stations.FirstOrDefault(s => s.StationIndex == currentStationIndex);
+    }
+}

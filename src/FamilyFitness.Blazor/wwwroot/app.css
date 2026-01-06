@@ -58,3 +58,275 @@ h1:focus {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
 }
+
+/* WOD Timer Styles */
+.wod-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.wod-timer {
+    border-radius: 20px;
+    padding: 40px;
+    margin-bottom: 30px;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
+}
+
+.phase-ready {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.phase-work {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+}
+
+.phase-cooldown {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    color: white;
+}
+
+.timer-display .phase-label {
+    font-size: 2rem;
+    font-weight: bold;
+    margin-bottom: 20px;
+    letter-spacing: 2px;
+}
+
+.timer-display .time-remaining {
+    font-size: 5rem;
+    font-weight: bold;
+    font-family: 'Courier New', monospace;
+    margin: 20px 0;
+}
+
+.timer-display .progress-info {
+    font-size: 1.2rem;
+    margin-top: 20px;
+    opacity: 0.9;
+}
+
+/* Station Assignments */
+.station-assignments {
+    margin-bottom: 30px;
+}
+
+.station-assignments h3 {
+    color: #333;
+    margin-bottom: 20px;
+    font-weight: 600;
+}
+
+.assignments-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.assignment-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border-left: 4px solid #1b6ec2;
+}
+
+.assignment-card .participant-name {
+    font-size: 1.3rem;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 10px;
+}
+
+.assignment-card .station-info {
+    color: #666;
+}
+
+.assignment-card .station-number {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1b6ec2;
+    margin-bottom: 5px;
+}
+
+.assignment-card .workout-name {
+    font-size: 1.2rem;
+    color: #333;
+    margin-bottom: 5px;
+}
+
+.assignment-card .workout-description {
+    font-size: 0.9rem;
+    color: #888;
+}
+
+/* Score Entry */
+.score-entry {
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.score-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.score-card {
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 20px;
+    border: 2px solid #e9ecef;
+}
+
+.score-card .score-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.score-card .station-badge {
+    background: #1b6ec2;
+    color: white;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+}
+
+.score-card .workout-name {
+    font-size: 1.1rem;
+    color: #666;
+    margin-bottom: 15px;
+}
+
+.score-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    margin: 20px 0;
+}
+
+.score-controls button {
+    width: 60px;
+    height: 60px;
+    font-size: 2rem;
+    border-radius: 50%;
+}
+
+.score-display {
+    font-size: 3rem;
+    font-weight: bold;
+    font-family: 'Courier New', monospace;
+    min-width: 100px;
+    text-align: center;
+}
+
+.quick-presets {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 10px;
+}
+
+.quick-presets button {
+    min-width: 50px;
+}
+
+/* Cooldown Container */
+.cooldown-container {
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.cooldown-container h3 {
+    color: #333;
+    margin-bottom: 20px;
+}
+
+.next-preview {
+    margin-top: 30px;
+    padding-top: 30px;
+    border-top: 2px solid #e9ecef;
+}
+
+.next-preview h4 {
+    color: #666;
+    margin-bottom: 20px;
+}
+
+/* Completion Screen */
+.completion-screen {
+    text-align: center;
+    padding: 60px 20px;
+}
+
+.completion-screen h1 {
+    font-size: 3rem;
+    margin-bottom: 20px;
+}
+
+.completion-screen p {
+    font-size: 1.5rem;
+    color: #666;
+    margin-bottom: 30px;
+}
+
+/* Home Container */
+.home-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 40px 20px;
+}
+
+.home-container h1 {
+    color: #333;
+    margin-bottom: 30px;
+}
+
+.home-container .card {
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Button Block */
+.btn-block {
+    width: 100%;
+}
+
+/* Mobile First - Large Tap Targets */
+@media (max-width: 768px) {
+    .timer-display .time-remaining {
+        font-size: 4rem;
+    }
+    
+    .assignments-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .score-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .btn-lg {
+        padding: 1rem 2rem;
+        font-size: 1.2rem;
+    }
+    
+    .score-controls button {
+        width: 70px;
+        height: 70px;
+        font-size: 2.5rem;
+    }
+}
