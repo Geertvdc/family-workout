@@ -21,7 +21,7 @@
             </div>
         </div>
     }
-    else if (session.Status == "Completed")
+    else if (session.Status == WorkoutSessionStatus.Completed)
     {
         <div class="completion-screen">
             <h1>🎉 Workout Complete!</h1>
@@ -29,7 +29,7 @@
             <button class="btn btn-primary btn-lg" @onclick="GoHome">Back to Home</button>
         </div>
     }
-    else if (session.Status == "Cancelled")
+    else if (session.Status == WorkoutSessionStatus.Cancelled)
     {
         <div class="completion-screen">
             <h1>Workout Cancelled</h1>
@@ -149,7 +149,7 @@
             session = await Http.GetFromJsonAsync<SessionDto>($"/api/workout-sessions/{SessionId}");
             assignments = await Http.GetFromJsonAsync<SessionAssignmentDto>($"/api/workout-sessions/{SessionId}/assignments");
 
-            if (session?.Status == "Pending")
+            if (session?.Status == WorkoutSessionStatus.Pending)
             {
                 // Start the session
                 var response = await Http.PostAsync($"/api/workout-sessions/{SessionId}/start", null);
@@ -159,7 +159,7 @@
                     StartTimer();
                 }
             }
-            else if (session?.Status == "Active")
+            else if (session?.Status == WorkoutSessionStatus.Active)
             {
                 // Resume from where we left off
                 StartTimer();
