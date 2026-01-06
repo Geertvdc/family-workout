@@ -8,14 +8,14 @@ public class SessionDto
     public DateTime SessionDate { get; set; }
     public DateTime? StartedAt { get; set; }
     public DateTime? EndedAt { get; set; }
-    public string Status { get; set; } = "";
+    public WorkoutSessionStatus Status { get; set; }
     public DateTime CreatedAt { get; set; }
 }
 
 public class SessionAssignmentDto
 {
     public Guid SessionId { get; set; }
-    public string Status { get; set; } = "";
+    public WorkoutSessionStatus Status { get; set; }
     public List<ParticipantDto> Participants { get; set; } = new();
     public List<StationDto> Stations { get; set; } = new();
 }
@@ -41,4 +41,12 @@ public enum TimerPhase
     Ready,
     Work,
     Cooldown
+}
+
+public enum WorkoutSessionStatus
+{
+    Pending = 0,
+    Active = 1,
+    Completed = 2,
+    Cancelled = 3
 }

@@ -58,6 +58,9 @@ public static class DatabaseSeeder
 
         await context.Groups.AddAsync(cruijsjes);
 
+        // Save users and groups before creating relationships
+        await context.SaveChangesAsync();
+
         // Create group memberships
         var memberships = new[]
         {
