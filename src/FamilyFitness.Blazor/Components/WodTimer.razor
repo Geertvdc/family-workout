@@ -1,0 +1,61 @@
+@using FamilyFitness.Blazor.Models
+
+<div class="wod-timer @GetPhaseClass()">
+    <div class="timer-display">
+        <div class="phase-label">
+            @GetPhaseLabel()
+        </div>
+        <div class="time-remaining">
+            @FormatTime(TimeRemaining)
+        </div>
+        <div class="progress-info">
+            Round @CurrentRound of 3 • Station @CurrentStation of 4
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public TimerPhase CurrentPhase { get; set; }
+
+    [Parameter]
+    public int TimeRemaining { get; set; }
+
+    [Parameter]
+    public int CurrentRound { get; set; }
+
+    [Parameter]
+    public int CurrentStation { get; set; }
+
+    [Parameter]
+    public EventCallback OnPhaseComplete { get; set; }
+
+    private string GetPhaseClass()
+    {
+        return CurrentPhase switch
+        {
+            TimerPhase.Ready => "phase-ready",
+            TimerPhase.Work => "phase-work",
+            TimerPhase.Cooldown => "phase-cooldown",
+            _ => ""
+        };
+    }
+
+    private string GetPhaseLabel()
+    {
+        return CurrentPhase switch
+        {
+            TimerPhase.Ready => "GET READY!",
+            TimerPhase.Work => "WORK!",
+            TimerPhase.Cooldown => "COOLDOWN",
+            _ => ""
+        };
+    }
+
+    private string FormatTime(int seconds)
+    {
+        var minutes = seconds / 60;
+        var secs = seconds % 60;
+        return $"{minutes:D2}:{secs:D2}";
+    }
+}

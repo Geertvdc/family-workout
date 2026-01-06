@@ -1,0 +1,163 @@
+@using FamilyFitness.Blazor.Models
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<div class="score-entry">
+    @if (error != null)
+    {
+        <div class="alert alert-danger">@error</div>
+    }
+
+    @if (success)
+    {
+        <div class="alert alert-success">Scores saved!</div>
+    }
+
+    @if (Participants != null && Stations != null)
+    {
+        <div class="score-grid">
+            @foreach (var participant in Participants.OrderBy(p => p.ParticipantIndex))
+            {
+                var station = GetStationForParticipant(participant);
+                if (station != null)
+                {
+                    var scoreKey = $"{participant.ParticipantId}_{CurrentRound}_{CurrentStation}";
+                    var currentScore = scores.GetValueOrDefault(scoreKey, 0);
+
+                    <div class="score-card">
+                        <div class="score-header">
+                            <strong>@participant.UserName</strong>
+                            <span class="station-badge">Station @station.StationIndex</span>
+                        </div>
+                        <div class="workout-name">@station.WorkoutTypeName</div>
+                        <div class="score-controls">
+                            <button class="btn btn-lg btn-secondary" @onclick="() => DecrementScore(scoreKey)">-</button>
+                            <div class="score-display">@currentScore</div>
+                            <button class="btn btn-lg btn-secondary" @onclick="() => IncrementScore(scoreKey)">+</button>
+                        </div>
+                        <div class="quick-presets">
+                            @foreach (var preset in new[] { 10, 20, 30, 50 })
+                            {
+                                <button class="btn btn-sm btn-outline-primary" @onclick="() => SetScore(scoreKey, preset)">@preset</button>
+                            }
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+
+        <button class="btn btn-primary btn-lg btn-block mt-3" @onclick="SaveScores" disabled="@saving">
+            @(saving ? "Saving..." : "Save Scores")
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public Guid SessionId { get; set; }
+
+    [Parameter]
+    public List<ParticipantDto>? Participants { get; set; }
+
+    [Parameter]
+    public List<StationDto>? Stations { get; set; }
+
+    [Parameter]
+    public int CurrentRound { get; set; }
+
+    [Parameter]
+    public int CurrentStation { get; set; }
+
+    [Parameter]
+    public EventCallback OnScoresSaved { get; set; }
+
+    private Dictionary<string, int> scores = new();
+    private bool saving = false;
+    private bool success = false;
+    private string? error;
+
+    private void IncrementScore(string key)
+    {
+        scores[key] = scores.GetValueOrDefault(key, 0) + 1;
+    }
+
+    private void DecrementScore(string key)
+    {
+        var current = scores.GetValueOrDefault(key, 0);
+        if (current > 0)
+        {
+            scores[key] = current - 1;
+        }
+    }
+
+    private void SetScore(string key, int value)
+    {
+        scores[key] = value;
+    }
+
+    private async Task SaveScores()
+    {
+        if (Participants == null || Stations == null)
+            return;
+
+        saving = true;
+        error = null;
+        success = false;
+
+        try
+        {
+            foreach (var participant in Participants)
+            {
+                var station = GetStationForParticipant(participant);
+                if (station != null)
+                {
+                    var scoreKey = $"{participant.ParticipantId}_{CurrentRound}_{CurrentStation}";
+                    var score = scores.GetValueOrDefault(scoreKey, 0);
+
+                    var command = new
+                    {
+                        ParticipantId = participant.ParticipantId,
+                        RoundNumber = CurrentRound,
+                        StationIndex = CurrentStation,
+                        WorkoutTypeId = station.WorkoutTypeId,
+                        Score = score,
+                        Weight = (decimal?)null
+                    };
+
+                    var response = await Http.PostAsJsonAsync("/api/workout-interval-scores", command);
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        error = $"Failed to save score for {participant.UserName}";
+                        saving = false;
+                        return;
+                    }
+                }
+            }
+
+            success = true;
+            await OnScoresSaved.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            error = $"Error saving scores: {ex.Message}";
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private StationDto? GetStationForParticipant(ParticipantDto participant)
+    {
+        if (Stations == null || Participants == null) return null;
+
+        var participantCount = Participants.Count;
+        var stationCount = Stations.Count;
+
+        var baseStationIndex = ((participant.ParticipantIndex - 1) % stationCount) + 1;
+        var intervalsCompleted = ((CurrentRound - 1) * stationCount) + (CurrentStation - 1);
+        var currentStationIndex = ((baseStationIndex - 1 + intervalsCompleted) % stationCount) + 1;
+
+        return Stations.FirstOrDefault(s => s.StationIndex == currentStationIndex);
+    }
+}

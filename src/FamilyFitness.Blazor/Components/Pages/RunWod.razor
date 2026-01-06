@@ -1,0 +1,292 @@
+@page "/run-wod/{sessionId:guid}"
+@using System.Net.Http.Json
+@using FamilyFitness.Blazor.Models
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>Run WOD</PageTitle>
+
+<div class="wod-container">
+    @if (error != null)
+    {
+        <div class="alert alert-danger">@error</div>
+    }
+
+    @if (session == null || assignments == null)
+    {
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (session.Status == "Completed")
+    {
+        <div class="completion-screen">
+            <h1>🎉 Workout Complete!</h1>
+            <p>Great job everyone!</p>
+            <button class="btn btn-primary btn-lg" @onclick="GoHome">Back to Home</button>
+        </div>
+    }
+    else if (session.Status == "Cancelled")
+    {
+        <div class="completion-screen">
+            <h1>Workout Cancelled</h1>
+            <button class="btn btn-primary btn-lg" @onclick="GoHome">Back to Home</button>
+        </div>
+    }
+    else
+    {
+        <WodTimer 
+            CurrentPhase="@currentPhase"
+            TimeRemaining="@timeRemaining"
+            CurrentRound="@currentRound"
+            CurrentStation="@currentStation"
+            OnPhaseComplete="@HandlePhaseComplete" />
+
+        @if (currentPhase == TimerPhase.Ready || currentPhase == TimerPhase.Work)
+        {
+            <StationAssignments 
+                Participants="@assignments.Participants"
+                Stations="@assignments.Stations"
+                CurrentRound="@currentRound"
+                CurrentStation="@currentStation"
+                Title="@(currentPhase == TimerPhase.Ready ? "Get Ready!" : "Current Stations")" />
+        }
+        else if (currentPhase == TimerPhase.Cooldown)
+        {
+            <div class="cooldown-container">
+                <h3>Score Entry - Round @currentRound</h3>
+                
+                <ScoreEntry
+                    SessionId="@SessionId"
+                    Participants="@assignments.Participants"
+                    Stations="@assignments.Stations"
+                    CurrentRound="@currentRound"
+                    CurrentStation="@currentStation"
+                    OnScoresSaved="@HandleScoresSaved" />
+
+                <div class="next-preview">
+                    <h4>Next Up:</h4>
+                    <StationAssignments 
+                        Participants="@assignments.Participants"
+                        Stations="@assignments.Stations"
+                        CurrentRound="@(currentRound)"
+                        CurrentStation="@(currentStation + 1)"
+                        Title="Next Stations" />
+                </div>
+
+                <button class="btn btn-success btn-lg btn-block mt-4" 
+                        @onclick="HandleNextStation"
+                        disabled="@(!cooldownComplete || !scoresEntered)">
+                    Next Station
+                </button>
+            </div>
+        }
+
+        <div class="controls mt-4">
+            <button class="btn btn-danger" @onclick="ShowCancelConfirmation">Cancel Workout</button>
+        </div>
+    }
+</div>
+
+@if (showCancelDialog)
+{
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Cancel Workout?</h5>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to cancel this workout? All missing scores will be set to 0.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="() => showCancelDialog = false">No, Continue</button>
+                    <button type="button" class="btn btn-danger" @onclick="CancelWorkout">Yes, Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop show"></div>
+}
+
+@code {
+    [Parameter]
+    public Guid SessionId { get; set; }
+
+    private SessionDto? session;
+    private SessionAssignmentDto? assignments;
+    private string? error;
+    private bool showCancelDialog = false;
+
+    // Timer state
+    private TimerPhase currentPhase = TimerPhase.Ready;
+    private int timeRemaining = 5;
+    private int currentRound = 1;
+    private int currentStation = 1;
+    private bool cooldownComplete = false;
+    private bool scoresEntered = false;
+    private System.Threading.Timer? timer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSessionData();
+    }
+
+    private async Task LoadSessionData()
+    {
+        try
+        {
+            session = await Http.GetFromJsonAsync<SessionDto>($"/api/workout-sessions/{SessionId}");
+            assignments = await Http.GetFromJsonAsync<SessionAssignmentDto>($"/api/workout-sessions/{SessionId}/assignments");
+
+            if (session?.Status == "Pending")
+            {
+                // Start the session
+                var response = await Http.PostAsync($"/api/workout-sessions/{SessionId}/start", null);
+                if (response.IsSuccessStatusCode)
+                {
+                    session = await response.Content.ReadFromJsonAsync<SessionDto>();
+                    StartTimer();
+                }
+            }
+            else if (session?.Status == "Active")
+            {
+                // Resume from where we left off
+                StartTimer();
+            }
+        }
+        catch (Exception ex)
+        {
+            error = $"Failed to load session: {ex.Message}";
+        }
+    }
+
+    private void StartTimer()
+    {
+        timer?.Dispose();
+        timer = new System.Threading.Timer(async _ => await TimerTick(), null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
+    }
+
+    private async Task TimerTick()
+    {
+        await InvokeAsync(() =>
+        {
+            timeRemaining--;
+
+            if (timeRemaining <= 0)
+            {
+                // Move to next phase
+                if (currentPhase == TimerPhase.Ready)
+                {
+                    currentPhase = TimerPhase.Work;
+                    timeRemaining = 60;
+                }
+                else if (currentPhase == TimerPhase.Work)
+                {
+                    currentPhase = TimerPhase.Cooldown;
+                    timeRemaining = 15;
+                    cooldownComplete = false;
+                    scoresEntered = false;
+                }
+                else if (currentPhase == TimerPhase.Cooldown)
+                {
+                    cooldownComplete = true;
+                }
+            }
+
+            StateHasChanged();
+        });
+    }
+
+    private void HandlePhaseComplete()
+    {
+        // Phase completion is handled by timer
+    }
+
+    private async Task HandleNextStation()
+    {
+        if (!cooldownComplete || !scoresEntered)
+            return;
+
+        // Advance to next station/round
+        currentStation++;
+        if (currentStation > 4)
+        {
+            currentStation = 1;
+            currentRound++;
+            
+            if (currentRound > 3)
+            {
+                // Workout complete
+                await CompleteWorkout();
+                return;
+            }
+        }
+
+        // Start next interval
+        currentPhase = TimerPhase.Ready;
+        timeRemaining = 5;
+    }
+
+    private void HandleScoresSaved()
+    {
+        scoresEntered = true;
+        StateHasChanged();
+    }
+
+    private async Task CompleteWorkout()
+    {
+        try
+        {
+            timer?.Dispose();
+            var response = await Http.PostAsync($"/api/workout-sessions/{SessionId}/complete", null);
+            if (response.IsSuccessStatusCode)
+            {
+                session = await response.Content.ReadFromJsonAsync<SessionDto>();
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            error = $"Failed to complete workout: {ex.Message}";
+        }
+    }
+
+    private void ShowCancelConfirmation()
+    {
+        showCancelDialog = true;
+    }
+
+    private async Task CancelWorkout()
+    {
+        try
+        {
+            timer?.Dispose();
+            var response = await Http.PostAsync($"/api/workout-sessions/{SessionId}/cancel", null);
+            if (response.IsSuccessStatusCode)
+            {
+                session = await response.Content.ReadFromJsonAsync<SessionDto>();
+                showCancelDialog = false;
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            error = $"Failed to cancel workout: {ex.Message}";
+            showCancelDialog = false;
+        }
+    }
+
+    private void GoHome()
+    {
+        Navigation.NavigateTo("/");
+    }
+
+    public void Dispose()
+    {
+        timer?.Dispose();
+    }
+}
