@@ -1,0 +1,63 @@
+name: Continuous Integration
+
+# Trigger the workflow on push to any branch and on pull requests targeting main or development
+on:
+  push:
+    branches:
+      - '**'  # Run on all branches
+  pull_request:
+    branches:
+      - main
+      - development
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    
+    # PostgreSQL service for integration tests
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: family_fitness
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Display .NET version
+        run: dotnet --version
+
+      - name: Restore dependencies
+        run: dotnet restore FamilyFitness.sln
+
+      - name: Build solution
+        run: dotnet build FamilyFitness.sln --configuration Release --no-restore
+
+      - name: Run tests
+        env:
+          # Connection string for integration tests
+          ConnectionStrings__postgres: "Host=localhost;Port=5432;Database=family_fitness;Username=postgres;Password=postgres"
+        run: dotnet test FamilyFitness.sln --configuration Release --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: '**/TestResults/*.trx'
+          retention-days: 30
