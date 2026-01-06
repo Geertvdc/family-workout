@@ -16,34 +16,27 @@ Create `WorkoutType` entity in `FamilyFitness.Domain` with:
 - `Id` (string) - Unique identifier
 - `Name` (string, required) - Name of the workout type, automatically trimmed
 - `Description` (string?, optional) - Description of the workout, automatically trimmed if provided
-- `EstimatedDurationMinutes` (int?, optional) - If provided, must be greater than 0
-- `Intensity` (Intensity enum) - Required: Light, Moderate, or Intense
 
 **Invariants (enforced in constructor):**
 - `Id` cannot be null or whitespace
 - `Name` cannot be null or whitespace
 - `Name` and `Description` are automatically trimmed
-- `EstimatedDurationMinutes`, if provided, must be > 0
 
 **Methods:**
 - Constructor: Validates all invariants
-- `WithUpdatedDetails(name, description, estimatedDurationMinutes, intensity)` - Returns new instance with updated values (immutable pattern)
+- `WithUpdatedDetails(name, description)` - Returns new instance with updated values (immutable pattern)
 
 **Example:**
 ```csharp
 var workoutType = new WorkoutType(
     id: "1",
     name: "Push-ups",
-    description: "Upper body strength exercise",
-    estimatedDurationMinutes: 5,
-    intensity: Intensity.Moderate
+    description: "Upper body strength exercise"
 );
 
 var updated = workoutType.WithUpdatedDetails(
     name: "Modified Push-ups",
-    description: "Easier variation",
-    estimatedDurationMinutes: 3,
-    intensity: Intensity.Light
+    description: "Easier variation"
 );
 ```
 
@@ -73,24 +66,18 @@ public interface IIdGenerator
 public record WorkoutTypeDto(
     string Id,
     string Name,
-    string? Description,
-    int? EstimatedDurationMinutes,
-    string Intensity  // String representation of enum
+    string? Description
 );
 
 public record CreateWorkoutTypeCommand(
     string Name,
-    string? Description,
-    int? EstimatedDurationMinutes,
-    Intensity Intensity
+    string? Description
 );
 
 public record UpdateWorkoutTypeCommand(
     string Id,
     string Name,
-    string? Description,
-    int? EstimatedDurationMinutes,
-    Intensity Intensity
+    string? Description
 );
 ```
 
@@ -125,25 +112,47 @@ public class GuidIdGenerator : IIdGenerator
 }
 ```
 
-**`WorkoutTypeDocument`** - Cosmos DB representation:
+**`WorkoutTypeEntity`** - EF Core entity representation:
 ```csharp
-public class WorkoutTypeDocument
+public class WorkoutTypeEntity
 {
-    public string id { get; set; } = string.Empty;  // lowercase for Cosmos convention
+    public string Id { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
-    public int? EstimatedDurationMinutes { get; set; }
-    public string Intensity { get; set; } = string.Empty;
-    public string PartitionKey { get; set; } = "WorkoutTypes";
 }
 ```
 
-**`CosmosWorkoutTypeRepository : IWorkoutTypeRepository`**
-- Uses Cosmos DB SDK
-- Database: `family-fitness`
-- Container: `workout-types`
-- Partition Key: `"WorkoutTypes"` (constant for all items)
-- Maps between `WorkoutType` (domain) and `WorkoutTypeDocument` (Cosmos)
+**`FamilyFitnessDbContext`** - Entity configuration:
+```csharp
+protected override void OnModelCreating(ModelBuilder modelBuilder)
+{
+    modelBuilder.Entity<WorkoutTypeEntity>(entity =>
+    {
+        entity.ToTable("workout_types");
+        entity.HasKey(e => e.Id);
+        
+        entity.Property(e => e.Id)
+            .HasMaxLength(50)
+            .IsRequired();
+        
+        entity.Property(e => e.Name)
+            .HasMaxLength(200)
+            .IsRequired();
+        
+        entity.Property(e => e.Description)
+            .HasMaxLength(1000);
+
+        entity.HasIndex(e => e.Name)
+            .IsUnique();
+    });
+}
+```
+
+**`PostgresWorkoutTypeRepository : IWorkoutTypeRepository`**
+- Uses Entity Framework Core
+- Database: `family_fitness`
+- Table: `workout_types`
+- Maps between `WorkoutType` (domain) and `WorkoutTypeEntity` (EF Core)
 
 ### API Layer
 
@@ -168,11 +177,11 @@ DELETE /api/workout-types/{id}     → 204 No Content | 404 Not Found
 
 Features:
 1. **List View**: Display all workout types in a table
-   - Show: Name, Description, Duration, Intensity
+   - Show: Name, Description
    - Include Delete button for each item
 
 2. **Create Form**: Form to create new workout type
-   - Fields: Name (required), Description (optional), Duration (optional), Intensity (dropdown)
+   - Fields: Name (required), Description (optional)
    - Submit button calls `POST /api/workout-types`
    - Clear form after successful creation
    - Show error message on conflict or validation error
@@ -238,8 +247,10 @@ public class FixedIdGenerator : IIdGenerator
 
 4. **Infrastructure Layer**
    - Implement GuidIdGenerator
-   - Implement WorkoutTypeDocument
-   - Implement CosmosWorkoutTypeRepository
+   - Implement WorkoutTypeEntity
+   - Configure entity in FamilyFitnessDbContext
+   - Implement PostgresWorkoutTypeRepository
+   - Create and apply EF Core migration
 
 5. **API Layer**
    - Implement minimal API endpoints
@@ -254,7 +265,7 @@ public class FixedIdGenerator : IIdGenerator
    - Add HttpClient configuration
 
 7. **Aspire Configuration**
-   - Configure Cosmos DB resource
+   - Configure PostgreSQL resource
    - Wire API and Blazor projects
    - Set connection strings
 
@@ -270,7 +281,7 @@ public class FixedIdGenerator : IIdGenerator
 - [ ] Can run application via Aspire
 - [ ] API endpoints are accessible and functional
 - [ ] Blazor page displays, creates, and deletes workout types
-- [ ] Data persists in Cosmos DB emulator
+- [ ] Data persists in PostgreSQL database
 - [ ] Duplicate name validation works (case-insensitive)
 - [ ] Appropriate HTTP status codes returned
 - [ ] Clean Architecture boundaries respected

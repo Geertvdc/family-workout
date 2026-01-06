@@ -7,7 +7,7 @@
 - **Architecture Pattern**: Clean Architecture
 - **Development Approach**: Test-Driven Development (TDD)
 - **API Style**: REST
-- **Database**: Azure Cosmos DB
+- **Database**: PostgreSQL with Entity Framework Core
 - **Local Development**: .NET Aspire
 - **Design Principle**: Keep it simple - don't add anything we don't need
 
@@ -46,15 +46,17 @@
 **Responsibility**: External concerns and technical implementations
 
 - Implements repository interfaces defined in Application layer
-- Database access (Cosmos DB)
+- Database access (PostgreSQL via Entity Framework Core)
 - External services
 - File system access
 - Depends on Application and Domain layers
 
 **Key Components**:
-- `CosmosWorkoutTypeRepository`: Cosmos DB implementation of `IWorkoutTypeRepository`
+- `PostgresWorkoutTypeRepository`: PostgreSQL implementation of `IWorkoutTypeRepository`
 - `GuidIdGenerator`: GUID-based implementation of `IIdGenerator`
-- Document models for database (e.g., `WorkoutTypeDocument`)
+- `FamilyFitnessDbContext`: EF Core DbContext for database configuration
+- Entity configurations using Fluent API
+- Database migrations for schema management
 
 ### 4. API Layer (`FamilyFitness.Api`)
 **Responsibility**: RESTful HTTP endpoints
@@ -94,7 +96,7 @@ DELETE /api/{resource}/{id} - Delete
 **Responsibility**: Local development orchestration
 
 - Configures and orchestrates all services for local development
-- Provisions Cosmos DB emulator
+- Provisions PostgreSQL database container
 - Manages service-to-service communication
 - Provides connection strings and configuration
 
@@ -113,24 +115,38 @@ Domain Layer (Entities with Business Rules)
     ↓
 Application Layer (Repository Interface)
     ↓
-Infrastructure Layer (Cosmos Repository Implementation)
+Infrastructure Layer (EF Core Repository Implementation)
     ↓
-Cosmos DB
+PostgreSQL Database
 ```
 
-## Cosmos DB Design
+## PostgreSQL Database Design
 
 ### Database Structure
-- **Database Name**: `family-fitness`
-- **Containers**:
-  - `workout-types`: Stores workout type definitions
-    - Partition Key: `"WorkoutTypes"` (simple partition strategy for MVP)
+- **Database Name**: `family_fitness`
+- **Tables**:
+  - `workout_types`: Stores workout type definitions
+  - `users`: User accounts
+  - `groups`: Family/group management
+  - `group_memberships`: User-to-group relationships with roles
+  - `workout_sessions`: Scheduled workout events
+  - `workout_session_workout_types`: Exercise assignments to session stations (4 per session)
+  - `workout_session_participants`: User participation tracking
+  - `workout_interval_scores`: Performance scores (3 rounds × 4 stations)
 
-### Document Pattern
-Infrastructure layer uses Document models (e.g., `WorkoutTypeDocument`) that:
-- Represent the JSON structure stored in Cosmos
-- Include Cosmos-specific metadata (`id`, partition key)
-- Map to/from Domain entities
+### Entity Framework Core Pattern
+Infrastructure layer uses:
+- **DbContext** (`FamilyFitnessDbContext`): Central database configuration
+- **Fluent API**: Entity configuration (table names, keys, relationships, constraints)
+- **Migrations**: Schema versioning and deployment
+- **Repository Pattern**: Data access abstraction over EF Core
+
+### Key Database Features
+- **Foreign Keys**: Enforced referential integrity between entities
+- **Unique Constraints**: Prevent duplicate usernames, emails, group memberships
+- **Check Constraints**: Validate ranges (e.g., StationIndex 1-4, RoundNumber 1-3)
+- **Indexes**: Optimized queries on frequently accessed columns
+- **Cascade Deletes**: Automatic cleanup of related records
 
 ## Testing Strategy
 
@@ -142,8 +158,9 @@ Infrastructure layer uses Document models (e.g., `WorkoutTypeDocument`) that:
 
 ### Integration Tests (`FamilyFitness.IntegrationTests`)
 - Test API endpoints with real infrastructure
-- May use Cosmos DB emulator
+- Use PostgreSQL test database or container
 - Test full request/response cycles
+- Verify database constraints and relationships
 
 ### End-to-End Tests (`FamilyFitness.EndToEndTests`)
 - Test complete user workflows
@@ -153,10 +170,12 @@ Infrastructure layer uses Document models (e.g., `WorkoutTypeDocument`) that:
 ## Key Design Decisions
 
 1. **Immutable Entities**: Domain entities use `With*` methods for updates instead of property setters
-2. **Simple Partition Key**: Using a constant partition key (`"WorkoutTypes"`) for MVP - optimize later if needed
+2. **PostgreSQL + EF Core**: Relational database for strong consistency, ACID transactions, and familiar SQL patterns
 3. **Minimal APIs**: Using .NET minimal APIs for simplicity
 4. **TDD Approach**: Write tests first, then implementation
 5. **No Over-Engineering**: Start simple, add complexity only when needed
+6. **Snake Case Tables**: Using PostgreSQL naming convention (e.g., `workout_types`)
+7. **Fluent API Configuration**: Entity configuration in DbContext rather than attributes
 
 ## Dependency Rules
 
@@ -169,9 +188,10 @@ Infrastructure layer uses Document models (e.g., `WorkoutTypeDocument`) that:
 
 ## Future Considerations
 
-- Optimize Cosmos partition keys when data grows
 - Add caching layer if needed
 - Add authentication/authorization
 - Add logging and monitoring
 - Add more sophisticated error handling
 - Consider CQRS pattern for complex queries
+- Optimize database indexes based on query patterns
+- Consider read replicas for scaling

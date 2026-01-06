@@ -50,31 +50,23 @@ public class WorkoutType
     public string Id { get; }
     public string Name { get; }
     public string? Description { get; }
-    public int? EstimatedDurationMinutes { get; }
-    public Intensity Intensity { get; }
 
-    public WorkoutType(string id, string name, string? description, 
-        int? estimatedDurationMinutes, Intensity intensity)
+    public WorkoutType(string id, string name, string? description)
     {
         // Validate and throw if invalid
         if (string.IsNullOrWhiteSpace(id))
             throw new ArgumentException("Id is required", nameof(id));
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Name is required", nameof(name));
-        // ... more validation
         
         Id = id;
         Name = name.Trim();
         Description = description?.Trim();
-        EstimatedDurationMinutes = estimatedDurationMinutes;
-        Intensity = intensity;
     }
 
-    public WorkoutType WithUpdatedDetails(string name, string? description,
-        int? estimatedDurationMinutes, Intensity intensity)
+    public WorkoutType WithUpdatedDetails(string name, string? description)
     {
-        return new WorkoutType(Id, name, description, 
-            estimatedDurationMinutes, intensity);
+        return new WorkoutType(Id, name, description);
     }
 }
 ```
@@ -85,17 +77,13 @@ public class WorkoutType
 public record WorkoutTypeDto(
     string Id,
     string Name,
-    string? Description,
-    int? EstimatedDurationMinutes,
-    string Intensity
+    string? Description
 );
 
 // Use record for Commands
 public record CreateWorkoutTypeCommand(
     string Name,
-    string? Description,
-    int? EstimatedDurationMinutes,
-    Intensity Intensity
+    string? Description
 );
 
 // Repository interfaces define data access contracts
@@ -128,25 +116,59 @@ public class WorkoutTypeService
 
 ### Infrastructure Layer
 ```csharp
-// Document models represent Cosmos DB structure
-public class WorkoutTypeDocument
+// Entity configurations in DbContext using Fluent API
+public class FamilyFitnessDbContext : DbContext
 {
-    public string id { get; set; } = string.Empty;  // lowercase for Cosmos
-    public string Name { get; set; } = string.Empty;
-    public string? Description { get; set; }
-    public int? EstimatedDurationMinutes { get; set; }
-    public string Intensity { get; set; } = string.Empty;
-    public string PartitionKey { get; set; } = "WorkoutTypes";
+    public FamilyFitnessDbContext(DbContextOptions<FamilyFitnessDbContext> options) 
+        : base(options)
+    {
+    }
+
+    public DbSet<WorkoutTypeEntity> WorkoutTypes => Set<WorkoutTypeEntity>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<WorkoutTypeEntity>(entity =>
+        {
+            entity.ToTable("workout_types");
+            entity.HasKey(e => e.Id);
+            
+            entity.Property(e => e.Id)
+                .HasMaxLength(50)
+                .IsRequired();
+            
+            entity.Property(e => e.Name)
+                .HasMaxLength(200)
+                .IsRequired();
+            
+            entity.Property(e => e.Description)
+                .HasMaxLength(1000);
+
+            entity.HasIndex(e => e.Name)
+                .IsUnique();
+        });
+    }
 }
 
 // Repository implementations handle data mapping
-public class CosmosWorkoutTypeRepository : IWorkoutTypeRepository
+public class PostgresWorkoutTypeRepository : IWorkoutTypeRepository
 {
-    private readonly Container _container;
+    private readonly FamilyFitnessDbContext _context;
     
-    // Map between Document and Domain entity
-    private static WorkoutType ToEntity(WorkoutTypeDocument doc) { /*...*/ }
-    private static WorkoutTypeDocument ToDocument(WorkoutType entity) { /*...*/ }
+    public PostgresWorkoutTypeRepository(FamilyFitnessDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<WorkoutType?> GetByIdAsync(string id)
+    {
+        var entity = await _context.WorkoutTypes.FindAsync(id);
+        return entity == null ? null : ToEntity(entity);
+    }
+    
+    // Map between Entity (EF Core) and Domain entity
+    private static WorkoutType ToEntity(WorkoutTypeEntity entity) { /*...*/ }
+    private static WorkoutTypeEntity ToDbEntity(WorkoutType domain) { /*...*/ }
 }
 ```
 
@@ -239,7 +261,7 @@ public class WorkoutTypeServiceTests
         var idGenerator = new FixedIdGenerator("test-id");
         var service = new WorkoutTypeService(repository, idGenerator);
         var command = new CreateWorkoutTypeCommand(
-            "Push-ups", "Upper body exercise", 10, Intensity.Moderate);
+            "Push-ups", "Upper body exercise");
 
         // Act
         var result = await service.CreateAsync(command);
@@ -256,12 +278,12 @@ public class WorkoutTypeServiceTests
         var repository = new InMemoryWorkoutTypeRepository();
         // Add existing workout type
         await repository.AddAsync(new WorkoutType(
-            "id1", "Push-ups", null, null, Intensity.Moderate));
+            "id1", "Push-ups", null));
         
         var service = new WorkoutTypeService(
             repository, new FixedIdGenerator("id2"));
         var command = new CreateWorkoutTypeCommand(
-            "Push-Ups", null, null, Intensity.Moderate); // Case insensitive
+            "Push-Ups", null); // Case insensitive
 
         // Act & Assert
         await Assert.ThrowsAsync<InvalidOperationException>(
@@ -293,30 +315,99 @@ public class FixedIdGenerator : IIdGenerator
 }
 ```
 
-## Cosmos DB Guidelines
+## PostgreSQL and Entity Framework Core Guidelines
 
 ### Database Configuration
-- Database: `family-fitness`
-- Containers use partition keys appropriate to their access patterns
-- For MVP, use simple partition keys (e.g., constant value `"WorkoutTypes"`)
-- Document `id` field should be lowercase (Cosmos convention)
+- Database: `family_fitness`
+- Tables use snake_case naming convention (e.g., `workout_types`, `group_memberships`)
+- All entity configurations done in `FamilyFitnessDbContext` using Fluent API
+- Foreign keys and constraints defined explicitly
+- Indexes added for frequently queried columns
 
-### Container Setup
+### DbContext Setup
 ```csharp
-// In repository or startup
-var database = client.GetDatabase("family-fitness");
-var container = database.GetContainer("workout-types");
+// In Program.cs (API project)
+var connectionString = builder.Configuration.GetConnectionString("family-fitness") 
+    ?? throw new InvalidOperationException("PostgreSQL connection string not found");
+
+builder.Services.AddDbContext<FamilyFitnessDbContext>(options =>
+    options.UseNpgsql(connectionString));
 ```
 
-### Querying
+### Entity Configuration Pattern
 ```csharp
-// Use LINQ when possible
-var query = _container.GetItemLinqQueryable<WorkoutTypeDocument>()
-    .Where(d => d.PartitionKey == "WorkoutTypes");
+protected override void OnModelCreating(ModelBuilder modelBuilder)
+{
+    modelBuilder.Entity<User>(entity =>
+    {
+        entity.ToTable("users");
+        entity.HasKey(e => e.Id);
+        
+        entity.Property(e => e.Username)
+            .HasMaxLength(100)
+            .IsRequired();
+        
+        entity.HasIndex(e => e.Username)
+            .IsUnique();
+        
+        // Relationships
+        entity.HasMany(u => u.GroupMemberships)
+            .WithOne(gm => gm.User)
+            .HasForeignKey(gm => gm.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+    });
+}
+```
 
-// For single item reads, use ReadItemAsync for efficiency
-var response = await _container.ReadItemAsync<WorkoutTypeDocument>(
-    id, new PartitionKey("WorkoutTypes"));
+### Using Migrations
+```bash
+# Create a new migration
+cd src/FamilyFitness.Api
+dotnet ef migrations add MigrationName --project ../FamilyFitness.Infrastructure
+
+# Apply migrations to database
+dotnet ef database update
+
+# Remove last migration (if not applied)
+dotnet ef migrations remove --project ../FamilyFitness.Infrastructure
+```
+
+### Repository Implementation
+```csharp
+public class PostgresWorkoutTypeRepository : IWorkoutTypeRepository
+{
+    private readonly FamilyFitnessDbContext _context;
+
+    public PostgresWorkoutTypeRepository(FamilyFitnessDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<IReadOnlyList<WorkoutType>> GetAllAsync()
+    {
+        var entities = await _context.WorkoutTypes.ToListAsync();
+        return entities.Select(ToEntity).ToList();
+    }
+
+    public async Task AddAsync(WorkoutType workoutType)
+    {
+        var entity = ToDbEntity(workoutType);
+        _context.WorkoutTypes.Add(entity);
+        await _context.SaveChangesAsync();
+    }
+
+    // Mapping methods
+    private static WorkoutType ToEntity(WorkoutTypeEntity entity) =>
+        new WorkoutType(entity.Id, entity.Name, entity.Description);
+
+    private static WorkoutTypeEntity ToDbEntity(WorkoutType domain) =>
+        new WorkoutTypeEntity 
+        { 
+            Id = domain.Id, 
+            Name = domain.Name, 
+            Description = domain.Description 
+        };
+}
 ```
 
 ## Aspire Configuration
@@ -325,17 +416,27 @@ var response = await _container.ReadItemAsync<WorkoutTypeDocument>(
 ```csharp
 var builder = DistributedApplication.CreateBuilder(args);
 
-// Add Cosmos DB
-var cosmos = builder.AddAzureCosmosDB("cosmos")
-    .RunAsEmulator();
+// Add PostgreSQL
+var postgres = builder.AddPostgres("postgres")
+    .WithPgAdmin();
 
-// Add API with Cosmos reference
+var postgresDb = postgres.AddDatabase("family-fitness");
+
+// Add API with PostgreSQL reference
 var api = builder.AddProject<Projects.FamilyFitness_Api>("api")
-    .WithReference(cosmos);
+    .WithReference(postgresDb);
 
 // Add Blazor with API reference
 builder.AddProject<Projects.FamilyFitness_Blazor>("blazor")
     .WithReference(api);
+
+builder.Build().Run();
+```
+
+### Connection String Configuration
+Aspire automatically injects the connection string named `"family-fitness"` into the API project. Access it via:
+```csharp
+var connectionString = builder.Configuration.GetConnectionString("family-fitness");
 ```
 
 ## Common Pitfalls to Avoid
