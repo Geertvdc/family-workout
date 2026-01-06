@@ -1,0 +1,355 @@
+@page "/setup-wod"
+@using System.Net.Http.Json
+@using FamilyFitness.Blazor.Models
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>Setup Workout</PageTitle>
+
+<div class="setup-container">
+    <h1>Setup Workout</h1>
+
+    @if (error != null)
+    {
+        <div class="alert alert-danger">@error</div>
+    }
+
+    @if (loading)
+    {
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (currentStep == 1)
+    {
+        <!-- Step 1: Select Workout Types -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h2>Step 1: Select 4 Workout Types</h2>
+                <p>Choose the exercises for today's workout</p>
+                
+                @if (availableWorkoutTypes == null || !availableWorkoutTypes.Any())
+                {
+                    <div class="alert alert-warning">
+                        No workout types available. Please create workout types first.
+                    </div>
+                }
+                else
+                {
+                    <div class="workout-types-grid">
+                        @foreach (var workoutType in availableWorkoutTypes)
+                        {
+                            var isSelected = selectedWorkoutTypes.Contains(workoutType);
+                            var buttonClass = isSelected ? "btn btn-success btn-lg workout-type-btn selected" : "btn btn-outline-primary btn-lg workout-type-btn";
+                            
+                            <button class="@buttonClass" 
+                                    @onclick="() => ToggleWorkoutType(workoutType)"
+                                    disabled="@(!isSelected && selectedWorkoutTypes.Count >= 4)">
+                                @if (isSelected)
+                                {
+                                    <span>✓ </span>
+                                }
+                                <strong>@workoutType.Name</strong>
+                                @if (!string.IsNullOrEmpty(workoutType.Description))
+                                {
+                                    <br/><small>@workoutType.Description</small>
+                                }
+                            </button>
+                        }
+                    </div>
+                    
+                    <div class="mt-4">
+                        <p>Selected: @selectedWorkoutTypes.Count / 4</p>
+                        <button class="btn btn-primary btn-lg" 
+                                @onclick="NextToParticipants"
+                                disabled="@(selectedWorkoutTypes.Count != 4)">
+                            Next: Select Participants
+                        </button>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+    else if (currentStep == 2)
+    {
+        <!-- Step 2: Select Participants -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h2>Step 2: Select Participants</h2>
+                <p>Who's working out today?</p>
+                
+                @if (availableUsers == null || !availableUsers.Any())
+                {
+                    <div class="alert alert-warning">
+                        No users available. Please create users first.
+                    </div>
+                }
+                else
+                {
+                    <div class="participants-grid">
+                        @foreach (var user in availableUsers)
+                        {
+                            var isSelected = selectedParticipants.Contains(user);
+                            var buttonClass = isSelected ? "btn btn-success btn-lg participant-btn selected" : "btn btn-outline-primary btn-lg participant-btn";
+                            
+                            <button class="@buttonClass" 
+                                    @onclick="() => ToggleParticipant(user)">
+                                @if (isSelected)
+                                {
+                                    <span>✓ </span>
+                                }
+                                <strong>@user.Username</strong>
+                            </button>
+                        }
+                    </div>
+                    
+                    <div class="mt-4">
+                        <p>Selected: @selectedParticipants.Count participant(s)</p>
+                        <button class="btn btn-secondary me-2" @onclick="BackToWorkoutTypes">
+                            Back
+                        </button>
+                        <button class="btn btn-primary btn-lg" 
+                                @onclick="NextToConfirm"
+                                disabled="@(selectedParticipants.Count == 0)">
+                            Next: Review & Start
+                        </button>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+    else if (currentStep == 3)
+    {
+        <!-- Step 3: Confirm and Start -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h2>Step 3: Review & Start</h2>
+                
+                <div class="review-section">
+                    <h4>Workout Types (4 Stations)</h4>
+                    <ol>
+                        @foreach (var wt in selectedWorkoutTypes)
+                        {
+                            <li><strong>@wt.Name</strong> - @wt.Description</li>
+                        }
+                    </ol>
+                    
+                    <h4 class="mt-4">Participants (@selectedParticipants.Count)</h4>
+                    <ul>
+                        @foreach (var user in selectedParticipants)
+                        {
+                            <li>@user.Username</li>
+                        }
+                    </ul>
+                    
+                    <div class="alert alert-info mt-4">
+                        <strong>Workout Format:</strong>
+                        <ul>
+                            <li>3 rounds × 4 stations = 12 intervals</li>
+                            <li>Each interval: 5s get ready + 60s work + 15s cooldown</li>
+                            <li>Participants will rotate through all stations</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="mt-4">
+                    <button class="btn btn-secondary me-2" @onclick="BackToParticipants">
+                        Back
+                    </button>
+                    <button class="btn btn-success btn-lg" 
+                            @onclick="CreateAndStartWorkout"
+                            disabled="@creating">
+                        @(creating ? "Creating..." : "Start Workout!")
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private int currentStep = 1;
+    private bool loading = true;
+    private bool creating = false;
+    private string? error;
+
+    // Hardcoded group ID for MVP
+    private readonly Guid defaultGroupId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private readonly Guid defaultCreatorId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+
+    private List<WorkoutTypeDto> availableWorkoutTypes = new();
+    private List<WorkoutTypeDto> selectedWorkoutTypes = new();
+    
+    private List<UserDto> availableUsers = new();
+    private List<UserDto> selectedParticipants = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        loading = true;
+        error = null;
+
+        try
+        {
+            // Load workout types
+            var workoutTypesResponse = await Http.GetFromJsonAsync<List<WorkoutTypeDto>>("/api/workout-types");
+            availableWorkoutTypes = workoutTypesResponse ?? new();
+
+            // Load users
+            var usersResponse = await Http.GetFromJsonAsync<List<UserDto>>("/api/users");
+            availableUsers = usersResponse ?? new();
+        }
+        catch (Exception ex)
+        {
+            error = $"Failed to load data: {ex.Message}";
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private void ToggleWorkoutType(WorkoutTypeDto workoutType)
+    {
+        if (selectedWorkoutTypes.Contains(workoutType))
+        {
+            selectedWorkoutTypes.Remove(workoutType);
+        }
+        else if (selectedWorkoutTypes.Count < 4)
+        {
+            selectedWorkoutTypes.Add(workoutType);
+        }
+    }
+
+    private void ToggleParticipant(UserDto user)
+    {
+        if (selectedParticipants.Contains(user))
+        {
+            selectedParticipants.Remove(user);
+        }
+        else
+        {
+            selectedParticipants.Add(user);
+        }
+    }
+
+    private void NextToParticipants()
+    {
+        currentStep = 2;
+    }
+
+    private void BackToWorkoutTypes()
+    {
+        currentStep = 1;
+    }
+
+    private void NextToConfirm()
+    {
+        currentStep = 3;
+    }
+
+    private void BackToParticipants()
+    {
+        currentStep = 2;
+    }
+
+    private async Task CreateAndStartWorkout()
+    {
+        creating = true;
+        error = null;
+
+        try
+        {
+            // 1. Create workout session
+            var createSessionCommand = new
+            {
+                GroupId = defaultGroupId,
+                CreatorId = defaultCreatorId,
+                SessionDate = DateTime.UtcNow
+            };
+
+            var sessionResponse = await Http.PostAsJsonAsync("/api/workout-sessions", createSessionCommand);
+            if (!sessionResponse.IsSuccessStatusCode)
+            {
+                error = "Failed to create workout session";
+                creating = false;
+                return;
+            }
+
+            var session = await sessionResponse.Content.ReadFromJsonAsync<SessionDto>();
+            if (session == null)
+            {
+                error = "Failed to parse session response";
+                creating = false;
+                return;
+            }
+
+            // 2. Add workout types to session (4 stations)
+            for (int i = 0; i < selectedWorkoutTypes.Count; i++)
+            {
+                var addWorkoutTypeCommand = new
+                {
+                    WorkoutSessionId = session.Id,
+                    WorkoutTypeId = selectedWorkoutTypes[i].Id,
+                    StationIndex = i + 1
+                };
+
+                var wtResponse = await Http.PostAsJsonAsync("/api/workout-session-workout-types", addWorkoutTypeCommand);
+                if (!wtResponse.IsSuccessStatusCode)
+                {
+                    error = $"Failed to add workout type {selectedWorkoutTypes[i].Name}";
+                    creating = false;
+                    return;
+                }
+            }
+
+            // 3. Add participants to session
+            for (int i = 0; i < selectedParticipants.Count; i++)
+            {
+                var addParticipantCommand = new
+                {
+                    WorkoutSessionId = session.Id,
+                    UserId = selectedParticipants[i].Id,
+                    ParticipantIndex = i + 1
+                };
+
+                var participantResponse = await Http.PostAsJsonAsync("/api/workout-session-participants", addParticipantCommand);
+                if (!participantResponse.IsSuccessStatusCode)
+                {
+                    error = $"Failed to add participant {selectedParticipants[i].Username}";
+                    creating = false;
+                    return;
+                }
+            }
+
+            // 4. Navigate to run WOD page (which will auto-start the session)
+            Navigation.NavigateTo($"/run-wod/{session.Id}");
+        }
+        catch (Exception ex)
+        {
+            error = $"Error creating workout: {ex.Message}";
+            creating = false;
+        }
+    }
+
+    private class WorkoutTypeDto
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string? Description { get; set; }
+    }
+
+    private class UserDto
+    {
+        public Guid Id { get; set; }
+        public string Username { get; set; } = "";
+        public string Email { get; set; } = "";
+    }
+}
