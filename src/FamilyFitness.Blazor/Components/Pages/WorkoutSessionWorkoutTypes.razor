@@ -20,18 +20,40 @@
         <h4>Create New Station Assignment</h4>
         <EditForm Model="@newItem" OnValidSubmit="@CreateItem">
             <div class="mb-3">
-                <label class="form-label">Workout Session ID *</label>
-                <InputText class="form-control" @bind-Value="newItem.WorkoutSessionId" required />
-                <small class="text-muted">Enter WorkoutSession GUID</small>
+                <label class="form-label">Workout Session *</label>
+                <InputSelect class="form-control" @bind-Value="newItem.WorkoutSessionId" required>
+                    <option value="">-- Select a Session --</option>
+                    @if (workoutSessions != null)
+                    {
+                        @foreach (var session in workoutSessions)
+                        {
+                            <option value="@session.Id">Session on @session.SessionDate.ToString("yyyy-MM-dd") (ID: @session.Id.ToString().Substring(0, 8)...)</option>
+                        }
+                    }
+                </InputSelect>
             </div>
             <div class="mb-3">
-                <label class="form-label">Workout Type ID *</label>
-                <InputText class="form-control" @bind-Value="newItem.WorkoutTypeId" required />
-                <small class="text-muted">Enter WorkoutType ID</small>
+                <label class="form-label">Workout Type *</label>
+                <InputSelect class="form-control" @bind-Value="newItem.WorkoutTypeId" required>
+                    <option value="">-- Select a Workout Type --</option>
+                    @if (workoutTypes != null)
+                    {
+                        @foreach (var type in workoutTypes)
+                        {
+                            <option value="@type.Id">@type.Name</option>
+                        }
+                    }
+                </InputSelect>
             </div>
             <div class="mb-3">
                 <label class="form-label">Station Index (1-4) *</label>
-                <InputNumber class="form-control" @bind-Value="newItem.StationIndex" required />
+                <InputSelect class="form-control" @bind-Value="newItem.StationIndex" required>
+                    <option value="0">-- Select a Station --</option>
+                    <option value="1">Station 1</option>
+                    <option value="2">Station 2</option>
+                    <option value="3">Station 3</option>
+                    <option value="4">Station 4</option>
+                </InputSelect>
             </div>
             <button type="submit" class="btn btn-primary" disabled="@isCreating">
                 @if (isCreating)
@@ -88,6 +110,8 @@ else
 
 @code {
     private List<WorkoutSessionWorkoutTypeDto>? items;
+    private List<WorkoutSessionDto>? workoutSessions;
+    private List<WorkoutTypeDto>? workoutTypes;
     private CreateWorkoutSessionWorkoutTypeModel newItem = new();
     private bool isCreating = false;
     private string? errorMessage;
@@ -96,6 +120,8 @@ else
     protected override async Task OnInitializedAsync()
     {
         await LoadItems();
+        await LoadWorkoutSessions();
+        await LoadWorkoutTypes();
     }
 
     private async Task LoadItems()
@@ -108,6 +134,30 @@ else
         catch (Exception ex)
         {
             errorMessage = $"Failed to load workout session workout types: {ex.Message}";
+        }
+    }
+
+    private async Task LoadWorkoutSessions()
+    {
+        try
+        {
+            workoutSessions = await Http.GetFromJsonAsync<List<WorkoutSessionDto>>("/api/workout-sessions");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load workout sessions: {ex.Message}";
+        }
+    }
+
+    private async Task LoadWorkoutTypes()
+    {
+        try
+        {
+            workoutTypes = await Http.GetFromJsonAsync<List<WorkoutTypeDto>>("/api/workout-types");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load workout types: {ex.Message}";
         }
     }
 
@@ -189,6 +239,25 @@ else
         public string WorkoutSessionId { get; set; } = string.Empty;
         public string WorkoutTypeId { get; set; } = string.Empty;
         public int StationIndex { get; set; } = 1;
+    }
+
+    public class WorkoutSessionDto
+    {
+        public Guid Id { get; set; }
+        public Guid GroupId { get; set; }
+        public Guid CreatorId { get; set; }
+        public DateTime SessionDate { get; set; }
+        public DateTime? StartedAt { get; set; }
+        public DateTime? EndedAt { get; set; }
+        public int Status { get; set; }
+        public DateTime CreatedAt { get; set; }
+    }
+
+    public class WorkoutTypeDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
     }
 
     public class ErrorResponse

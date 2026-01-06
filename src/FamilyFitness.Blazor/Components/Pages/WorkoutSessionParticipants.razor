@@ -20,14 +20,30 @@
         <h4>Create New Participant</h4>
         <EditForm Model="@newParticipant" OnValidSubmit="@CreateParticipant">
             <div class="mb-3">
-                <label class="form-label">Workout Session ID *</label>
-                <InputText class="form-control" @bind-Value="newParticipant.WorkoutSessionId" required />
-                <small class="text-muted">Enter WorkoutSession GUID</small>
+                <label class="form-label">Workout Session *</label>
+                <InputSelect class="form-control" @bind-Value="newParticipant.WorkoutSessionId" required>
+                    <option value="">-- Select a Session --</option>
+                    @if (workoutSessions != null)
+                    {
+                        @foreach (var session in workoutSessions)
+                        {
+                            <option value="@session.Id">Session on @session.SessionDate.ToString("yyyy-MM-dd") (ID: @session.Id.ToString().Substring(0, 8)...)</option>
+                        }
+                    }
+                </InputSelect>
             </div>
             <div class="mb-3">
-                <label class="form-label">User ID *</label>
-                <InputText class="form-control" @bind-Value="newParticipant.UserId" required />
-                <small class="text-muted">Enter User GUID</small>
+                <label class="form-label">User *</label>
+                <InputSelect class="form-control" @bind-Value="newParticipant.UserId" required>
+                    <option value="">-- Select a User --</option>
+                    @if (users != null)
+                    {
+                        @foreach (var user in users)
+                        {
+                            <option value="@user.Id">@user.Username (@user.Email)</option>
+                        }
+                    }
+                </InputSelect>
             </div>
             <div class="mb-3">
                 <label class="form-label">Participant Index *</label>
@@ -91,6 +107,8 @@ else
 
 @code {
     private List<WorkoutSessionParticipantDto>? participants;
+    private List<WorkoutSessionDto>? workoutSessions;
+    private List<UserDto>? users;
     private CreateWorkoutSessionParticipantModel newParticipant = new();
     private bool isCreating = false;
     private string? errorMessage;
@@ -99,6 +117,8 @@ else
     protected override async Task OnInitializedAsync()
     {
         await LoadParticipants();
+        await LoadWorkoutSessions();
+        await LoadUsers();
     }
 
     private async Task LoadParticipants()
@@ -111,6 +131,30 @@ else
         catch (Exception ex)
         {
             errorMessage = $"Failed to load workout session participants: {ex.Message}";
+        }
+    }
+
+    private async Task LoadWorkoutSessions()
+    {
+        try
+        {
+            workoutSessions = await Http.GetFromJsonAsync<List<WorkoutSessionDto>>("/api/workout-sessions");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load workout sessions: {ex.Message}";
+        }
+    }
+
+    private async Task LoadUsers()
+    {
+        try
+        {
+            users = await Http.GetFromJsonAsync<List<UserDto>>("/api/users");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load users: {ex.Message}";
         }
     }
 
@@ -193,6 +237,26 @@ else
         public string WorkoutSessionId { get; set; } = string.Empty;
         public string UserId { get; set; } = string.Empty;
         public int ParticipantIndex { get; set; } = 1;
+    }
+
+    public class WorkoutSessionDto
+    {
+        public Guid Id { get; set; }
+        public Guid GroupId { get; set; }
+        public Guid CreatorId { get; set; }
+        public DateTime SessionDate { get; set; }
+        public DateTime? StartedAt { get; set; }
+        public DateTime? EndedAt { get; set; }
+        public int Status { get; set; }
+        public DateTime CreatedAt { get; set; }
+    }
+
+    public class UserDto
+    {
+        public Guid Id { get; set; }
+        public string Username { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
     }
 
     public class ErrorResponse
