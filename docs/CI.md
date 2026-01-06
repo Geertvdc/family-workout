@@ -299,7 +299,7 @@ If CI is failing and you need help:
 
 Track these metrics to ensure CI health:
 
-- **Success Rate**: Aim for >95%
+- **Success Rate**: Aim for 100%
 - **Build Time**: Keep under 5 minutes
 - **Test Coverage**: Monitor trends
 - **Flaky Tests**: Identify and fix
