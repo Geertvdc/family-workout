@@ -493,6 +493,119 @@ app.MapDelete("/api/workout-sessions/{id:guid}", async (Guid id, WorkoutSessionS
 })
 .WithName("DeleteWorkoutSession");
 
+// WorkoutSession control endpoints
+app.MapPost("/api/workout-sessions/{id:guid}/start", async (Guid id, WorkoutSessionService service) =>
+{
+    try
+    {
+        var command = new StartSessionCommand(id);
+        var session = await service.StartSessionAsync(command);
+        return Results.Ok(session);
+    }
+    catch (KeyNotFoundException ex)
+    {
+        return Results.NotFound(new { error = ex.Message });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+})
+.WithName("StartWorkoutSession");
+
+app.MapPost("/api/workout-sessions/{id:guid}/cancel", async (Guid id, WorkoutSessionService service) =>
+{
+    try
+    {
+        var command = new CancelSessionCommand(id);
+        var session = await service.CancelSessionAsync(command);
+        return Results.Ok(session);
+    }
+    catch (KeyNotFoundException ex)
+    {
+        return Results.NotFound(new { error = ex.Message });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+})
+.WithName("CancelWorkoutSession");
+
+app.MapPost("/api/workout-sessions/{id:guid}/complete", async (Guid id, WorkoutSessionService service) =>
+{
+    try
+    {
+        var command = new CompleteSessionCommand(id);
+        var session = await service.CompleteSessionAsync(command);
+        return Results.Ok(session);
+    }
+    catch (KeyNotFoundException ex)
+    {
+        return Results.NotFound(new { error = ex.Message });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+})
+.WithName("CompleteWorkoutSession");
+
+app.MapGet("/api/groups/{groupId:guid}/active-session", async (Guid groupId, WorkoutSessionService service) =>
+{
+    var session = await service.GetActiveSessionByGroupIdAsync(groupId);
+    if (session == null)
+    {
+        return Results.NotFound(new { error = "No active session found for this group" });
+    }
+    return Results.Ok(session);
+})
+.WithName("GetActiveWorkoutSession");
+
+app.MapGet("/api/workout-sessions/{id:guid}/assignments", async (Guid id, WorkoutSessionService service, WorkoutTypeService workoutTypeService) =>
+{
+    try
+    {
+        var assignments = await service.GetSessionAssignmentsAsync(id);
+        
+        // Enrich station data with workout type names
+        var enrichedStations = new List<StationDto>();
+        foreach (var station in assignments.Stations)
+        {
+            try
+            {
+                var workoutType = await workoutTypeService.GetByIdAsync(station.WorkoutTypeId);
+                enrichedStations.Add(new StationDto(
+                    station.StationIndex,
+                    station.WorkoutTypeId,
+                    workoutType.Name,
+                    workoutType.Description
+                ));
+            }
+            catch
+            {
+                // If workout type not found, use original
+                enrichedStations.Add(station);
+            }
+        }
+        
+        var enrichedAssignments = new SessionAssignmentDto(
+            assignments.SessionId,
+            assignments.Status,
+            assignments.Participants,
+            enrichedStations
+        );
+        
+        return Results.Ok(enrichedAssignments);
+    }
+    catch (KeyNotFoundException ex)
+    {
+        return Results.NotFound(new { error = ex.Message });
+    }
+})
+.WithName("GetWorkoutSessionAssignments");
+
+
 // WorkoutSessionWorkoutType endpoints
 app.MapGet("/api/workout-session-workout-types", async (WorkoutSessionWorkoutTypeService service) =>
 {

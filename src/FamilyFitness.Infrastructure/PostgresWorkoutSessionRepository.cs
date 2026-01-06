@@ -41,6 +41,14 @@ public class PostgresWorkoutSessionRepository : IWorkoutSessionRepository
             .ToListAsync();
     }
 
+    public async Task<WorkoutSession?> GetActiveSessionByGroupIdAsync(Guid groupId)
+    {
+        return await _context.WorkoutSessions
+            .Where(ws => ws.GroupId == groupId && ws.Status == WorkoutSessionStatus.Active)
+            .OrderByDescending(ws => ws.StartedAt)
+            .FirstOrDefaultAsync();
+    }
+
     public async Task AddAsync(WorkoutSession session)
     {
         await _context.WorkoutSessions.AddAsync(session);
