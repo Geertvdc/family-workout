@@ -8,14 +8,15 @@ This repository uses GitHub Actions to automatically build and test all componen
 
 The CI workflow (`.github/workflows/ci.yml`) runs automatically on:
 
-1. **Every push to any branch**
-   - Ensures all commits are buildable and pass tests
-   - Provides immediate feedback to developers
+1. **Every push to `main` or `development` branches**
+   - Ensures commits to protected branches are buildable and pass tests
+   - Provides immediate feedback after merging
 
 2. **Every pull request (PR) targeting `main` or `development` branches**
    - Acts as a quality gate before merging
    - Prevents broken code from entering main branches
    - PR cannot be merged if CI fails
+   - Avoids duplicate runs when pushing to PR branches
 
 ## Pipeline Steps
 
