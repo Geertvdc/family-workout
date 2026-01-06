@@ -1,5 +1,7 @@
 # FamilyFitness App
 
+[![Continuous Integration](https://github.com/Geertvdc/family-workout/actions/workflows/ci.yml/badge.svg)](https://github.com/Geertvdc/family-workout/actions/workflows/ci.yml)
+
 A family workout tracking application built with .NET 10, Blazor, and PostgreSQL.
 
 ## Architecture
@@ -120,6 +122,15 @@ dotnet test
 # Run only unit tests
 dotnet test tests/FamilyFitness.UnitTests/FamilyFitness.UnitTests.csproj
 ```
+
+## Continuous Integration
+
+This project uses GitHub Actions for automated testing. Every commit and pull request triggers a CI build that:
+- Compiles all projects (.NET 10)
+- Runs all unit, integration, and end-to-end tests
+- Uses PostgreSQL 17 for integration tests
+
+See [docs/CI.md](docs/CI.md) for detailed CI pipeline documentation.
 
 ## API Endpoints
 
