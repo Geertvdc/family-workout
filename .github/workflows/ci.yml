@@ -1,10 +1,11 @@
 name: Continuous Integration
 
-# Trigger the workflow on push to any branch and on pull requests targeting main or development
+# Trigger the workflow on push to main/development branches and on all pull requests
 on:
   push:
     branches:
-      - '**'  # Run on all branches
+      - main
+      - development
   pull_request:
     branches:
       - main
