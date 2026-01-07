@@ -1,28 +1,41 @@
 @using FamilyFitness.Blazor.Models
 @implements IDisposable
 
-<div class="wod-timer @GetPhaseClass()">
-    <div class="timer-display">
-        <div class="phase-label">
-            @GetPhaseLabel()
-        </div>
-        <div class="time-remaining">
-            @FormatTime(TimeRemaining)
-        </div>
-        
-        @if (CurrentPhase == TimerPhase.Work)
-        {
-            <div class="motivational-message">
-                @currentMotivationalMessage
-            </div>
-        }
-        
-        <div class="progress-info">
-            Round <span class="highlight">@CurrentRound</span> of 3 • 
-            Station <span class="highlight">@CurrentStation</span> of 4
+@if (CompactMode && CurrentPhase == TimerPhase.Cooldown)
+{
+    <div class="wod-timer-compact @GetPhaseClass()">
+        <div class="compact-timer-content">
+            <div class="compact-phase-label">@GetPhaseLabel()</div>
+            <div class="compact-time">@FormatTime(TimeRemaining)</div>
+            <div class="compact-progress">Round <span class="highlight">@CurrentRound</span>/3 • Station <span class="highlight">@CurrentStation</span>/4</div>
         </div>
     </div>
-</div>
+}
+else
+{
+    <div class="wod-timer @GetPhaseClass()">
+        <div class="timer-display">
+            <div class="phase-label">
+                @GetPhaseLabel()
+            </div>
+            <div class="time-remaining">
+                @FormatTime(TimeRemaining)
+            </div>
+            
+            @if (CurrentPhase == TimerPhase.Work)
+            {
+                <div class="motivational-message">
+                    @currentMotivationalMessage
+                </div>
+            }
+            
+            <div class="progress-info">
+                Round <span class="highlight">@CurrentRound</span> of 3 • 
+                Station <span class="highlight">@CurrentStation</span> of 4
+            </div>
+        </div>
+    </div>
+}
 
 @code {
     [Parameter]
@@ -39,6 +52,9 @@
 
     [Parameter]
     public EventCallback OnPhaseComplete { get; set; }
+
+    [Parameter]
+    public bool CompactMode { get; set; } = false;
 
     private string currentMotivationalMessage = "";
     private System.Threading.Timer? messageTimer;

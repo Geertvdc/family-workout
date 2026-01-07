@@ -5,22 +5,19 @@
     
     @if (Participants != null && Stations != null)
     {
-        <div class="assignments-grid">
+        <div class="assignments-list">
             @foreach (var participant in GetParticipantsAtStation())
             {
                 var station = GetStationForParticipant(participant);
                 if (station != null)
                 {
-                    <div class="assignment-card card-dark">
-                        <div class="participant-name">@participant.UserName</div>
-                        <div class="station-info">
-                            <div class="station-badge">STATION @station.StationIndex</div>
-                            <div class="workout-name">@station.WorkoutTypeName</div>
-                            @if (!string.IsNullOrEmpty(station.WorkoutTypeDescription))
-                            {
-                                <div class="workout-description">@station.WorkoutTypeDescription</div>
-                            }
-                        </div>
+                    <div class="assignment-line">
+                        <div class="participant-name-line">@participant.UserName</div>
+                        <div class="exercise-name-line">@station.WorkoutTypeName</div>
+                        @if (!string.IsNullOrEmpty(station.WorkoutTypeDescription))
+                        {
+                            <div class="exercise-description-line">@station.WorkoutTypeDescription</div>
+                        }
                     </div>
                 }
             }
