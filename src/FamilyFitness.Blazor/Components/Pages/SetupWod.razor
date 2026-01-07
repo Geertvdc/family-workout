@@ -176,9 +176,9 @@
     private bool creating = false;
     private string? error;
 
-    // Hardcoded group ID for MVP
-    private readonly Guid defaultGroupId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-    private readonly Guid defaultCreatorId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    // Hardcoded group ID and creator ID for MVP (matches seeded data)
+    private readonly Guid defaultGroupId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+    private readonly Guid defaultCreatorId = Guid.Parse("11111111-1111-1111-1111-111111111111");
 
     private List<WorkoutTypeDto> availableWorkoutTypes = new();
     private List<WorkoutTypeDto> selectedWorkoutTypes = new();
