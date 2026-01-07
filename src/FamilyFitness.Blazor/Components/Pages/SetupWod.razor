@@ -5,7 +5,7 @@
 @inject NavigationManager Navigation
 @rendermode InteractiveServer
 
-<PageTitle>Setup Workout</PageTitle>
+<PageTitle>FFWD - Setup Workout</PageTitle>
 
 <div class="setup-container">
     <h1>Setup Workout</h1>
@@ -43,14 +43,14 @@
                         @foreach (var workoutType in availableWorkoutTypes)
                         {
                             var isSelected = selectedWorkoutTypes.Contains(workoutType);
-                            var buttonClass = isSelected ? "btn btn-success btn-lg workout-type-btn selected" : "btn btn-outline-primary btn-lg workout-type-btn";
+                            var buttonClass = isSelected ? "btn btn-success btn-lg workout-type-btn selected" : "btn btn-secondary btn-lg workout-type-btn";
                             
                             <button class="@buttonClass" 
                                     @onclick="() => ToggleWorkoutType(workoutType)"
                                     disabled="@(!isSelected && selectedWorkoutTypes.Count >= 4)">
                                 @if (isSelected)
                                 {
-                                    <span>✓ </span>
+                                    <span class="checkmark">✓ </span>
                                 }
                                 <strong>@workoutType.Name</strong>
                                 @if (!string.IsNullOrEmpty(workoutType.Description))
@@ -93,13 +93,13 @@
                         @foreach (var user in availableUsers)
                         {
                             var isSelected = selectedParticipants.Contains(user);
-                            var buttonClass = isSelected ? "btn btn-success btn-lg participant-btn selected" : "btn btn-outline-primary btn-lg participant-btn";
+                            var buttonClass = isSelected ? "btn btn-success btn-lg participant-btn selected" : "btn btn-secondary btn-lg participant-btn";
                             
                             <button class="@buttonClass" 
                                     @onclick="() => ToggleParticipant(user)">
                                 @if (isSelected)
                                 {
-                                    <span>✓ </span>
+                                    <span class="checkmark">✓ </span>
                                 }
                                 <strong>@user.Username</strong>
                             </button>
@@ -124,47 +124,97 @@
     else if (currentStep == 3)
     {
         <!-- Step 3: Confirm and Start -->
-        <div class="card mb-4">
-            <div class="card-body">
-                <h2>Step 3: Review & Start</h2>
-                
-                <div class="review-section">
-                    <h4>Workout Types (4 Stations)</h4>
-                    <ol>
-                        @foreach (var wt in selectedWorkoutTypes)
-                        {
-                            <li><strong>@wt.Name</strong> - @wt.Description</li>
-                        }
-                    </ol>
-                    
-                    <h4 class="mt-4">Participants (@selectedParticipants.Count)</h4>
-                    <ul>
-                        @foreach (var user in selectedParticipants)
-                        {
-                            <li>@user.Username</li>
-                        }
-                    </ul>
-                    
-                    <div class="alert alert-info mt-4">
-                        <strong>Workout Format:</strong>
-                        <ul>
-                            <li>3 rounds × 4 stations = 12 intervals</li>
-                            <li>Each interval: 5s get ready + 60s work + 15s cooldown</li>
-                            <li>Participants will rotate through all stations</li>
-                        </ul>
+        <div class="review-container">
+            <h2>Review Your Workout</h2>
+            
+            <!-- Workout Stations -->
+            <div class="review-section-card">
+                <div class="review-section-header">
+                    <h3>Workout Stations</h3>
+                    <span class="review-badge">4 Stations</span>
+                </div>
+                <div class="review-stations-grid">
+                    @for (int i = 0; i < selectedWorkoutTypes.Count; i++)
+                    {
+                        var wt = selectedWorkoutTypes[i];
+                        <div class="review-station-card">
+                            <div class="station-number-large">@(i + 1)</div>
+                            <div class="station-details">
+                                <div class="station-name">@wt.Name</div>
+                                @if (!string.IsNullOrEmpty(wt.Description))
+                                {
+                                    <div class="station-description">@wt.Description</div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+            
+            <!-- Participants -->
+            <div class="review-section-card">
+                <div class="review-section-header">
+                    <h3>Participants</h3>
+                    <span class="review-badge">@selectedParticipants.Count Athletes</span>
+                </div>
+                <div class="review-participants-grid">
+                    @foreach (var user in selectedParticipants)
+                    {
+                        <div class="review-participant-card">
+                            <div class="participant-icon">👤</div>
+                            <div class="participant-name-review">@user.Username</div>
+                        </div>
+                    }
+                </div>
+            </div>
+            
+            <!-- Workout Format Info -->
+            <div class="review-info-card">
+                <h3>Workout Format</h3>
+                <div class="workout-stats">
+                    <div class="workout-stat">
+                        <div class="stat-number">3</div>
+                        <div class="stat-label">Rounds</div>
+                    </div>
+                    <div class="workout-stat-separator">×</div>
+                    <div class="workout-stat">
+                        <div class="stat-number">4</div>
+                        <div class="stat-label">Stations</div>
+                    </div>
+                    <div class="workout-stat-separator">=</div>
+                    <div class="workout-stat">
+                        <div class="stat-number">12</div>
+                        <div class="stat-label">Intervals</div>
                     </div>
                 </div>
-                
-                <div class="mt-4">
-                    <button class="btn btn-secondary me-2" @onclick="BackToParticipants">
-                        Back
-                    </button>
-                    <button class="btn btn-success btn-lg" 
-                            @onclick="CreateAndStartWorkout"
-                            disabled="@creating">
-                        @(creating ? "Creating..." : "Start Workout!")
-                    </button>
+                <div class="interval-breakdown">
+                    <div class="interval-item">
+                        <span class="interval-time">5s</span>
+                        <span class="interval-name">Get Ready</span>
+                    </div>
+                    <div class="interval-separator">+</div>
+                    <div class="interval-item">
+                        <span class="interval-time">60s</span>
+                        <span class="interval-name">Work</span>
+                    </div>
+                    <div class="interval-separator">+</div>
+                    <div class="interval-item">
+                        <span class="interval-time">15s</span>
+                        <span class="interval-name">Cooldown</span>
+                    </div>
                 </div>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="review-actions">
+                <button class="btn btn-secondary btn-lg" @onclick="BackToParticipants">
+                    ← Back
+                </button>
+                <button class="btn btn-success btn-lg btn-start-workout" 
+                        @onclick="CreateAndStartWorkout"
+                        disabled="@creating">
+                    @(creating ? "CREATING..." : "🔥 START WORKOUT! 🔥")
+                </button>
             </div>
         </div>
     }

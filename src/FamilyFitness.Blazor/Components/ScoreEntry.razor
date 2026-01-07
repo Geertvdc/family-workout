@@ -24,21 +24,21 @@
                     var scoreKey = $"{participant.ParticipantId}_{CurrentRound}_{CurrentStation}";
                     var currentScore = scores.GetValueOrDefault(scoreKey, 0);
 
-                    <div class="score-card">
+                    <div class="score-card card-dark">
                         <div class="score-header">
-                            <strong>@participant.UserName</strong>
-                            <span class="station-badge">Station @station.StationIndex</span>
+                            <strong class="participant-name-score">@participant.UserName</strong>
+                            <span class="station-badge">STATION @station.StationIndex</span>
                         </div>
-                        <div class="workout-name">@station.WorkoutTypeName</div>
+                        <div class="workout-name-score">@station.WorkoutTypeName</div>
                         <div class="score-controls">
-                            <button class="btn btn-lg btn-secondary" @onclick="() => DecrementScore(scoreKey)">-</button>
+                            <button class="btn-score" @onclick="() => DecrementScore(scoreKey)">−</button>
                             <div class="score-display">@currentScore</div>
-                            <button class="btn btn-lg btn-secondary" @onclick="() => IncrementScore(scoreKey)">+</button>
+                            <button class="btn-score" @onclick="() => IncrementScore(scoreKey)">+</button>
                         </div>
                         <div class="quick-presets">
                             @foreach (var preset in new[] { 10, 20, 30, 50 })
                             {
-                                <button class="btn btn-sm btn-outline-primary" @onclick="() => SetScore(scoreKey, preset)">@preset</button>
+                                <button class="btn-preset" @onclick="() => SetScore(scoreKey, preset)">@preset</button>
                             }
                         </div>
                     </div>
@@ -47,7 +47,7 @@
         </div>
 
         <button class="btn btn-primary btn-lg btn-block mt-3" @onclick="SaveScores" disabled="@saving">
-            @(saving ? "Saving..." : "Save Scores")
+            @(saving ? "SAVING..." : "SAVE SCORES")
         </button>
     }
 </div>

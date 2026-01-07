@@ -1,14 +1,15 @@
-﻿@page "/"
+@page "/"
 @using System.Net.Http.Json
 @using FamilyFitness.Blazor.Models
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @rendermode InteractiveServer
 
-<PageTitle>Home</PageTitle>
+<PageTitle>FFWD - Home</PageTitle>
 
 <div class="home-container">
-    <h1>Family Fitness</h1>
+    <h1>FFWD</h1>
+    <p class="tagline">Workout of the Day</p>
 
     @if (error != null)
     {
@@ -25,12 +26,13 @@
     }
     else if (activeSession != null)
     {
-        <div class="card mt-4">
+        <div class="card card-active">
             <div class="card-body">
-                <h2>Active Workout</h2>
+                <div class="active-badge">ACTIVE WORKOUT</div>
+                <h2>Workout in Progress</h2>
                 <p>You have an active workout in progress!</p>
-                <button class="btn btn-success btn-lg" @onclick="ResumeWorkout">Resume Workout</button>
-                <button class="btn btn-secondary ms-2" @onclick="CancelActiveSession">Cancel Session</button>
+                <button class="btn btn-primary btn-lg btn-block" @onclick="ResumeWorkout">Resume Workout</button>
+                <button class="btn btn-secondary mt-2" @onclick="CancelActiveSession">Cancel Session</button>
             </div>
         </div>
     }
@@ -39,8 +41,8 @@
         <div class="card mt-4">
             <div class="card-body">
                 <h2>Start a New Workout</h2>
-                <p>Ready to get started? Setup your workout below.</p>
-                <a href="/setup-wod" class="btn btn-primary btn-lg">Start New Workout</a>
+                <p>Ready to push your limits?</p>
+                <a href="/setup-wod" class="btn btn-primary btn-lg btn-block">Start New Workout</a>
             </div>
         </div>
     }
