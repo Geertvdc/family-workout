@@ -51,8 +51,8 @@
     private bool loading = true;
     private string? error;
 
-    // Hardcoded group ID for MVP - in production this would come from user context
-    private readonly Guid defaultGroupId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    // Hardcoded group ID for MVP - in production this would come from user context (matches seeded data)
+    private readonly Guid defaultGroupId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
 
     protected override async Task OnInitializedAsync()
     {
