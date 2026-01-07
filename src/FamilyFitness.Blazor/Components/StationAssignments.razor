@@ -11,10 +11,10 @@
                 var station = GetStationForParticipant(participant);
                 if (station != null)
                 {
-                    <div class="assignment-card">
+                    <div class="assignment-card card-dark">
                         <div class="participant-name">@participant.UserName</div>
                         <div class="station-info">
-                            <div class="station-number">Station @station.StationIndex</div>
+                            <div class="station-badge">STATION @station.StationIndex</div>
                             <div class="workout-name">@station.WorkoutTypeName</div>
                             @if (!string.IsNullOrEmpty(station.WorkoutTypeDescription))
                             {

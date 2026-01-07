@@ -1,11 +1,13 @@
 @page "/run-wod/{sessionId:guid}"
 @using System.Net.Http.Json
 @using FamilyFitness.Blazor.Models
+@using Microsoft.JSInterop
 @inject HttpClient Http
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 @rendermode InteractiveServer
 
-<PageTitle>Run WOD</PageTitle>
+<PageTitle>FFWD - Workout</PageTitle>
 
 <div class="wod-container">
     @if (error != null)
@@ -24,15 +26,15 @@
     else if (session.Status == WorkoutSessionStatus.Completed)
     {
         <div class="completion-screen">
-            <h1>🎉 Workout Complete!</h1>
-            <p>Great job everyone!</p>
+            <h1>🔥 WORKOUT COMPLETE! 🔥</h1>
+            <p class="completion-subtitle">GREAT JOB!</p>
             <button class="btn btn-primary btn-lg" @onclick="GoHome">Back to Home</button>
         </div>
     }
     else if (session.Status == WorkoutSessionStatus.Cancelled)
     {
         <div class="completion-screen">
-            <h1>Workout Cancelled</h1>
+            <h1>WORKOUT CANCELLED</h1>
             <button class="btn btn-primary btn-lg" @onclick="GoHome">Back to Home</button>
         </div>
     }
@@ -80,13 +82,13 @@
                 <button class="btn btn-success btn-lg btn-block mt-4" 
                         @onclick="HandleNextStation"
                         disabled="@(!cooldownComplete || !scoresEntered)">
-                    Next Station
+                    NEXT STATION
                 </button>
             </div>
         }
 
         <div class="controls mt-4">
-            <button class="btn btn-danger" @onclick="ShowCancelConfirmation">Cancel Workout</button>
+            <button class="btn btn-danger" @onclick="ShowCancelConfirmation">CANCEL WORKOUT</button>
         </div>
     }
 </div>
@@ -253,6 +255,23 @@
             if (response.IsSuccessStatusCode)
             {
                 session = await response.Content.ReadFromJsonAsync<SessionDto>();
+                
+                // Trigger confetti celebration
+                try
+                {
+                    await JS.InvokeVoidAsync("confetti", new
+                    {
+                        particleCount = 150,
+                        spread = 70,
+                        origin = new { y = 0.6 },
+                        colors = new[] { "#E63946", "#FFFFFF", "#000000" }
+                    });
+                }
+                catch
+                {
+                    // Confetti failed but that's okay
+                }
+                
                 StateHasChanged();
             }
         }
