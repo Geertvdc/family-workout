@@ -1,0 +1,117 @@
+@page "/admin"
+@rendermode InteractiveServer
+
+<PageTitle>Admin</PageTitle>
+
+<h1>Admin Panel</h1>
+
+<div class="admin-grid">
+    <div class="admin-section">
+        <h3>User Management</h3>
+        <div class="admin-links">
+            <a href="/users" class="admin-card">
+                <span class="bi bi-people-fill"></span>
+                <span>Users</span>
+            </a>
+            <a href="/groups" class="admin-card">
+                <span class="bi bi-collection-fill"></span>
+                <span>Groups</span>
+            </a>
+            <a href="/group-memberships" class="admin-card">
+                <span class="bi bi-person-badge-fill"></span>
+                <span>Group Memberships</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="admin-section">
+        <h3>Workout Management</h3>
+        <div class="admin-links">
+            <a href="/workout-types" class="admin-card">
+                <span class="bi bi-heart-pulse-fill"></span>
+                <span>Workout Types</span>
+            </a>
+            <a href="/workout-sessions" class="admin-card">
+                <span class="bi bi-calendar-event-fill"></span>
+                <span>Workout Sessions</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="admin-section">
+        <h3>Session Management</h3>
+        <div class="admin-links">
+            <a href="/workout-session-workout-types" class="admin-card">
+                <span class="bi bi-layout-split"></span>
+                <span>Session Stations</span>
+            </a>
+            <a href="/workout-session-participants" class="admin-card">
+                <span class="bi bi-person-lines-fill"></span>
+                <span>Session Participants</span>
+            </a>
+            <a href="/workout-interval-scores" class="admin-card">
+                <span class="bi bi-graph-up"></span>
+                <span>Interval Scores</span>
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+    .admin-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 2rem;
+        margin-top: 2rem;
+    }
+
+    .admin-section {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 1.5rem;
+    }
+
+    .admin-section h3 {
+        margin-top: 0;
+        margin-bottom: 1rem;
+        color: #495057;
+        border-bottom: 2px solid #dee2e6;
+        padding-bottom: 0.5rem;
+    }
+
+    .admin-links {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .admin-card {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 1rem;
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        text-decoration: none;
+        color: #495057;
+        transition: all 0.2s ease;
+    }
+
+    .admin-card:hover {
+        background: #e9ecef;
+        color: #212529;
+        text-decoration: none;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .admin-card .bi {
+        font-size: 1.25rem;
+        width: 1.5rem;
+    }
+
+    .admin-card span:last-child {
+        font-weight: 500;
+    }
+</style>

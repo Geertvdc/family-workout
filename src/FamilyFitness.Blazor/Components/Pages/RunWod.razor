@@ -1,13 +1,14 @@
 @page "/run-wod/{sessionId:guid}"
 @using System.Net.Http.Json
 @using FamilyFitness.Blazor.Models
+@using FamilyFitness.Blazor.Components
 @using Microsoft.JSInterop
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 @rendermode InteractiveServer
 
-<PageTitle>FFWD - Workout</PageTitle>
+<PageTitle>FFWOD - Workout</PageTitle>
 
 <div class="wod-container">
     @if (error != null)
@@ -40,56 +41,83 @@
     }
     else
     {
-        <WodTimer 
-            CurrentPhase="@currentPhase"
-            TimeRemaining="@timeRemaining"
-            CurrentRound="@currentRound"
-            CurrentStation="@currentStation"
-            OnPhaseComplete="@HandlePhaseComplete" />
-
         @if (currentPhase == TimerPhase.Ready || currentPhase == TimerPhase.Work)
         {
-            <StationAssignments 
-                Participants="@assignments.Participants"
-                Stations="@assignments.Stations"
-                CurrentRound="@currentRound"
-                CurrentStation="@currentStation"
-                Title="@(currentPhase == TimerPhase.Ready ? "Get Ready!" : "Current Stations")" />
+            <div class="wod-live-layout">
+                <div class="wod-live-timer">
+                    <WodTimer 
+                        CurrentPhase="@currentPhase"
+                        TimeRemaining="@timeRemaining"
+                        CurrentRound="@currentRound"
+                        CurrentStation="@currentStation"
+                        OnPhaseComplete="@HandlePhaseComplete" />
+                </div>
+                <div class="wod-live-assignments">
+                    <StationAssignments 
+                        Participants="@assignments.Participants"
+                        Stations="@assignments.Stations"
+                        CurrentRound="@currentRound"
+                        CurrentStation="@currentStation"
+                        Title="@(currentPhase == TimerPhase.Ready ? "Get Ready!" : "Current Stations")" />
+                    
+                    <div class="workout-controls">
+                        <button class="btn btn-danger" @onclick="ShowCancelConfirmation">CANCEL WORKOUT</button>
+                    </div>
+                </div>
+            </div>
         }
         else if (currentPhase == TimerPhase.Cooldown)
         {
+            <WodTimer 
+                CurrentPhase="@currentPhase"
+                TimeRemaining="@timeRemaining"
+                CurrentRound="@currentRound"
+                CurrentStation="@currentStation"
+                CompactMode="true"
+                OnPhaseComplete="@HandlePhaseComplete" />
+
             <div class="cooldown-container">
                 <h3>Score Entry - Round @currentRound</h3>
                 
-                <ScoreEntry
+                <ScoreEntry @ref="scoreEntryRef"
                     SessionId="@SessionId"
                     Participants="@assignments.Participants"
                     Stations="@assignments.Stations"
                     CurrentRound="@currentRound"
                     CurrentStation="@currentStation"
-                    OnScoresSaved="@HandleScoresSaved" />
+                    OnScoresSaved="@HandleScoresSaved"
+                    OnSavingStateChanged="@HandleSavingStateChanged" />
 
-                <div class="next-preview">
-                    <h4>Next Up:</h4>
-                    <StationAssignments 
-                        Participants="@assignments.Participants"
-                        Stations="@assignments.Stations"
-                        CurrentRound="@(currentRound)"
-                        CurrentStation="@(currentStation + 1)"
-                        Title="Next Stations" />
+                <div class="next-preview-compact">
+                    <h4>NEXT UP</h4>
+                    <div class="next-assignments-boxes">
+                        @if (assignments.Participants != null && assignments.Stations != null)
+                        {
+                            @foreach (var participant in assignments.Participants.OrderBy(p => p.ParticipantIndex))
+                            {
+                                var nextStation = GetNextStationForParticipant(participant);
+                                if (nextStation != null)
+                                {
+                                    <div class="next-assignment-box">
+                                        <div class="next-participant">@participant.UserName</div>
+                                        <div class="next-exercise">@nextStation.WorkoutTypeName</div>
+                                    </div>
+                                }
+                            }
+                        }
+                    </div>
                 </div>
 
-                <button class="btn btn-success btn-lg btn-block mt-4" 
-                        @onclick="HandleNextStation"
-                        disabled="@(!cooldownComplete || !scoresEntered)">
-                    NEXT STATION
-                </button>
+                <div class="cooldown-actions mt-4">
+                    <button class="btn btn-outline-secondary" @onclick="ShowCancelConfirmation">CANCEL</button>
+                    <button class="btn btn-success btn-lg" 
+                            @onclick="HandleSaveAndNextStation"
+                            disabled="@(!cooldownComplete || savingScores)">
+                        @(savingScores ? "SAVING..." : "NEXT STATION")
+                    </button>
+                </div>
             </div>
         }
-
-        <div class="controls mt-4">
-            <button class="btn btn-danger" @onclick="ShowCancelConfirmation">CANCEL WORKOUT</button>
-        </div>
     }
 </div>
 
@@ -137,7 +165,9 @@
     private int currentStation = 1;
     private bool cooldownComplete = false;
     private bool scoresEntered = false;
+    private bool savingScores = false;
     private System.Threading.Timer? timer;
+    private ScoreEntry? scoreEntryRef;
 
     protected override async Task OnInitializedAsync()
     {
@@ -246,6 +276,27 @@
         StateHasChanged();
     }
 
+    private void HandleSavingStateChanged(bool isSaving)
+    {
+        savingScores = isSaving;
+        StateHasChanged();
+    }
+
+    private async Task HandleSaveAndNextStation()
+    {
+        if (!cooldownComplete || scoreEntryRef == null)
+            return;
+
+        // Save scores first
+        await scoreEntryRef.SaveScoresExternal();
+        
+        // If saving was successful, move to next station
+        if (scoresEntered)
+        {
+            await HandleNextStation();
+        }
+    }
+
     private async Task CompleteWorkout()
     {
         try
@@ -309,6 +360,21 @@
     private void GoHome()
     {
         Navigation.NavigateTo("/");
+    }
+
+    private StationDto? GetNextStationForParticipant(ParticipantDto participant)
+    {
+        if (assignments?.Stations == null || assignments?.Participants == null) return null;
+
+        var participantCount = assignments.Participants.Count;
+        var stationCount = assignments.Stations.Count;
+
+        // Calculate next station (same logic as StationAssignments but for next interval)
+        var baseStationIndex = ((participant.ParticipantIndex - 1) % stationCount) + 1;
+        var nextIntervalsCompleted = ((currentRound - 1) * stationCount) + currentStation; // +1 from current
+        var nextStationIndex = ((baseStationIndex - 1 + nextIntervalsCompleted) % stationCount) + 1;
+
+        return assignments.Stations.FirstOrDefault(s => s.StationIndex == nextStationIndex);
     }
 
     public void Dispose()

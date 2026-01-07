@@ -15,7 +15,14 @@
 
     @if (Participants != null && Stations != null)
     {
-        <div class="score-grid">
+        <div class="score-table">
+            <div class="score-table-header">
+                <div class="col-participant">PARTICIPANT</div>
+                <div class="col-exercise">EXERCISE</div>
+                <div class="col-score">SCORE</div>
+                <div class="col-presets">QUICK</div>
+            </div>
+            
             @foreach (var participant in Participants.OrderBy(p => p.ParticipantIndex))
             {
                 var station = GetStationForParticipant(participant);
@@ -24,31 +31,36 @@
                     var scoreKey = $"{participant.ParticipantId}_{CurrentRound}_{CurrentStation}";
                     var currentScore = scores.GetValueOrDefault(scoreKey, 0);
 
-                    <div class="score-card card-dark">
-                        <div class="score-header">
-                            <strong class="participant-name-score">@participant.UserName</strong>
-                            <span class="station-badge">STATION @station.StationIndex</span>
+                    <div class="score-table-row">
+                        <div class="col-participant">
+                            <span class="participant-name-table">@participant.UserName</span>
                         </div>
-                        <div class="workout-name-score">@station.WorkoutTypeName</div>
-                        <div class="score-controls">
-                            <button class="btn-score" @onclick="() => DecrementScore(scoreKey)">−</button>
-                            <div class="score-display">@currentScore</div>
-                            <button class="btn-score" @onclick="() => IncrementScore(scoreKey)">+</button>
-                        </div>
-                        <div class="quick-presets">
-                            @foreach (var preset in new[] { 10, 20, 30, 50 })
+                        <div class="col-exercise">
+                            <span class="exercise-name-table">@station.WorkoutTypeName</span>
+                            @if (!string.IsNullOrEmpty(station.WorkoutTypeDescription))
                             {
-                                <button class="btn-preset" @onclick="() => SetScore(scoreKey, preset)">@preset</button>
+                                <div class="exercise-description-table">@station.WorkoutTypeDescription</div>
                             }
+                        </div>
+                        <div class="col-score">
+                            <div class="score-controls-table">
+                                <button class="btn-score-table" @onclick="() => DecrementScore(scoreKey)">−</button>
+                                <div class="score-display-table">@currentScore</div>
+                                <button class="btn-score-table" @onclick="() => IncrementScore(scoreKey)">+</button>
+                            </div>
+                        </div>
+                        <div class="col-presets">
+                            <div class="quick-presets-table">
+                                @foreach (var preset in new[] { 15, 30, 45, 60 })
+                                {
+                                    <button class="btn-preset-table" @onclick="() => SetScore(scoreKey, preset)">@preset</button>
+                                }
+                            </div>
                         </div>
                     </div>
                 }
             }
         </div>
-
-        <button class="btn btn-primary btn-lg btn-block mt-3" @onclick="SaveScores" disabled="@saving">
-            @(saving ? "SAVING..." : "SAVE SCORES")
-        </button>
     }
 </div>
 
@@ -71,8 +83,10 @@
     [Parameter]
     public EventCallback OnScoresSaved { get; set; }
 
+    [Parameter]
+    public EventCallback<bool> OnSavingStateChanged { get; set; }
+
     private Dictionary<string, int> scores = new();
-    private bool saving = false;
     private bool success = false;
     private string? error;
 
@@ -95,12 +109,12 @@
         scores[key] = value;
     }
 
-    private async Task SaveScores()
+    public async Task SaveScoresExternal()
     {
         if (Participants == null || Stations == null)
             return;
 
-        saving = true;
+        await OnSavingStateChanged.InvokeAsync(true);
         error = null;
         success = false;
 
@@ -128,7 +142,7 @@
                     if (!response.IsSuccessStatusCode)
                     {
                         error = $"Failed to save score for {participant.UserName}";
-                        saving = false;
+                        await OnSavingStateChanged.InvokeAsync(false);
                         return;
                     }
                 }
@@ -143,7 +157,7 @@
         }
         finally
         {
-            saving = false;
+            await OnSavingStateChanged.InvokeAsync(false);
         }
     }
 
