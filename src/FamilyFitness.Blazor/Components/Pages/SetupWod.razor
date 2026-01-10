@@ -87,9 +87,17 @@
                         No users available. Please create users first.
                     </div>
                 }
-                else
-                {
-                    <div class="participants-grid">
+                 else
+                 {
+                     <div class="mb-3">
+                         <button class="btn btn-outline-primary me-2" @onclick="SelectAllParticipants">
+                             Select All
+                         </button>
+                         <button class="btn btn-outline-secondary" @onclick="ClearAllParticipants">
+                             Clear All
+                         </button>
+                     </div>
+                     <div class="participants-grid">
                         @foreach (var user in availableUsers)
                         {
                             var isSelected = selectedParticipants.Contains(user);
@@ -288,6 +296,17 @@
         {
             selectedParticipants.Add(user);
         }
+    }
+
+    private void SelectAllParticipants()
+    {
+        selectedParticipants.Clear();
+        selectedParticipants.AddRange(availableUsers);
+    }
+
+    private void ClearAllParticipants()
+    {
+        selectedParticipants.Clear();
     }
 
     private void NextToParticipants()

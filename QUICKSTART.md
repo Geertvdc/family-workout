@@ -2,6 +2,27 @@
 
 ## Running the FamilyFitness App Locally
 
+**Important**: The FamilyFitness app requires Azure Entra External ID authentication. Follow the **Authentication Setup** section below before running the application.
+
+### Authentication Setup (Required)
+
+The app uses Azure Entra External ID (CIAM) for authentication. You need to configure user secrets for the Blazor app:
+
+1. **Configure Blazor client secret**:
+   ```bash
+   cd src/FamilyFitness.Blazor
+   dotnet user-secrets set "AzureAd:ClientSecret" "YOUR_CLIENT_SECRET_FROM_AZURE"
+   ```
+
+2. **Verify configuration**: The following settings are already configured:
+   - **Blazor Client ID**: `3d9bde47-ee26-443f-9593-1ebb936982b2`
+   - **API Client ID**: `2b8a282a-98b0-4162-9553-4c5b8882bdcc` 
+   - **Authority**: `https://ffworkoutoftheday.ciamlogin.com/12094d72-73f9-4374-8d1e-8181315429a1/v2.0`
+   - **Redirect URI**: `https://localhost:7002/signin-oidc`
+   - **API Scope**: `api://2b8a282a-98b0-4162-9553-4c5b8882bdcc/user_access`
+
+3. **Test sign-in**: Once running, navigate to https://localhost:7002 and click "Sign in". You can sign in with Google or create a new account.
+
 ### Using .NET Aspire (Recommended)
 
 .NET Aspire orchestrates all services automatically and works on all platforms.
@@ -17,14 +38,19 @@ dotnet tool install -g aspire.cli
 # Navigate to project root
 cd /path/to/family-workout
 
-# Run with Aspire CLI
+# Configure authentication (see above)
+cd src/FamilyFitness.Blazor
+dotnet user-secrets set "AzureAd:ClientSecret" "YOUR_CLIENT_SECRET"
+
+# Return to project root and run
+cd ../..
 aspire run aspire/FamilyFitness.AppHost/FamilyFitness.AppHost.csproj
 ```
 
 This single command will:
 1. Start PostgreSQL in a Docker container (requires Docker)
-2. Start the API with proper connection strings
-3. Start the Blazor UI with proper API URL configuration
+2. Start the API with proper connection strings and JWT authentication
+3. Start the Blazor UI with OIDC authentication
 4. Display the Aspire dashboard URL in the console output
 
 From the Aspire dashboard you can:
@@ -35,6 +61,7 @@ From the Aspire dashboard you can:
 **Requirements**: 
 - Docker must be running
 - Aspire CLI installed (`dotnet tool install -g aspire.cli`)
+- Azure Entra client secret configured (see Authentication Setup above)
 
 **Note**: PostgreSQL works on all platforms including ARM Macs (Apple Silicon), Intel Macs, Windows, and Linux.
 
@@ -43,6 +70,8 @@ From the Aspire dashboard you can:
 ### Manual Setup (Alternative Method)
 
 If you prefer to run services individually:
+
+**Prerequisites**: Complete the **Authentication Setup** section above first.
 
 ### 1. Start PostgreSQL
 
@@ -69,8 +98,10 @@ dotnet run
 ```
 
 The API will start at:
-- HTTPS: https://localhost:7001
-- HTTP: http://localhost:5001
+- HTTPS: https://localhost:7163 (configured for this auth setup)
+- HTTP: http://localhost:5163
+
+**Note**: All API endpoints now require authentication. Use the Blazor UI to authenticate first.
 
 ### 3. Run the Blazor App
 
@@ -78,6 +109,10 @@ In a new terminal:
 
 ```bash
 cd src/FamilyFitness.Blazor
+
+# Ensure client secret is configured
+dotnet user-secrets set "AzureAd:ClientSecret" "YOUR_CLIENT_SECRET"
+
 dotnet run
 ```
 
@@ -87,39 +122,19 @@ The Blazor app will start at:
 
 ### 4. Access the Application
 
-Open your browser and navigate to:
-- Blazor UI: https://localhost:7002
-- Navigate to "Workout Types" in the menu
-- Create, view, and delete workout types
+1. **Open your browser** and navigate to: https://localhost:7002
+2. **Sign in** using the "Sign in" link in the navigation menu
+3. **Authenticate** with Google or create a new account via Azure Entra External ID
+4. **Explore the app** - all API endpoints are now protected and require authentication
 
 ### 5. Test the API Directly
 
-You can test the API using the Swagger UI:
-- Navigate to: https://localhost:7001/openapi/v1.json
-- Or use tools like Postman, curl, or the included `.http` file
+The API now requires authentication. After signing in through the Blazor app, you can test the API:
 
-Example curl commands:
+- **Get current user**: https://localhost:7163/api/me
+- **OpenAPI spec**: https://localhost:7163/openapi/v1.json (in Development)
 
-```bash
-# List all workout types
-curl -X GET https://localhost:7001/api/workout-types -k
-
-# Create a workout type
-curl -X POST https://localhost:7001/api/workout-types -k \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Push-ups",
-    "description": "Upper body strength exercise",
-    "estimatedDurationMinutes": 5,
-    "intensity": 1
-  }'
-
-# Get a specific workout type
-curl -X GET https://localhost:7001/api/workout-types/{id} -k
-
-# Delete a workout type
-curl -X DELETE https://localhost:7001/api/workout-types/{id} -k
-```
+**Note**: Direct API access requires a valid JWT token from Azure Entra External ID.
 
 ## Running Tests
 
