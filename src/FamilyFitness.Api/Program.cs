@@ -1,6 +1,10 @@
+using System.Security.Claims;
 using FamilyFitness.Application;
+using FamilyFitness.Domain;
 using FamilyFitness.Infrastructure;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,12 +20,20 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Register PostgreSQL
-var connectionString = builder.Configuration.GetConnectionString("family-fitness") 
-    ?? throw new InvalidOperationException("PostgreSQL connection string not found");
+// Register database
+if (builder.Environment.IsEnvironment("Testing"))
+{
+    builder.Services.AddDbContext<FamilyFitnessDbContext>(options =>
+        options.UseInMemoryDatabase("FamilyFitnessTesting"));
+}
+else
+{
+    var connectionString = builder.Configuration.GetConnectionString("family-fitness")
+        ?? throw new InvalidOperationException("PostgreSQL connection string not found");
 
-builder.Services.AddDbContext<FamilyFitnessDbContext>(options =>
-    options.UseNpgsql(connectionString));
+    builder.Services.AddDbContext<FamilyFitnessDbContext>(options =>
+        options.UseNpgsql(connectionString));
+}
 
 // Register repositories
 builder.Services.AddScoped<IWorkoutTypeRepository, PostgresWorkoutTypeRepository>();
@@ -44,9 +56,44 @@ builder.Services.AddScoped<WorkoutSessionWorkoutTypeService>();
 builder.Services.AddScoped<WorkoutSessionParticipantService>();
 builder.Services.AddScoped<WorkoutIntervalScoreService>();
 
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.MapInboundClaims = false;
+        options.Authority = builder.Configuration["AzureAd:Authority"];
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidAudience = builder.Configuration["AzureAd:Audience"],
+            ValidateAudience = true,
+            ValidateIssuer = true,
+            ValidIssuer = builder.Configuration["AzureAd:Issuer"] ?? builder.Configuration["AzureAd:Authority"],
+            NameClaimType = "name"
+        };
+    });
+
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = options.DefaultPolicy;
+});
+
 var app = builder.Build();
 
-// Ensure database is created (for development)
+app.UseAuthentication();
+app.UseAuthorization();
+
+// Debug endpoint to check API authentication
+app.MapGet("/api/debug/auth", (ClaimsPrincipal user) =>
+{
+    return new
+    {
+        IsAuthenticated = user.Identity?.IsAuthenticated,
+        AuthenticationType = user.Identity?.AuthenticationType,
+        Name = user.Identity?.Name,
+        Claims = user.Claims.Select(c => new { c.Type, c.Value }).ToList()
+    };
+}).RequireAuthorization();
+
+// Ensure database is created and seeded (for Development)
 if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
@@ -75,6 +122,85 @@ if (app.Environment.IsDevelopment())
     }
 }
 
+// Add /api/me endpoint for user provisioning
+app.MapGet("/api/me", async (ClaimsPrincipal user, UserService userService, ILogger<Program> logger) =>
+{
+    // Log all claims for debugging
+    logger.LogInformation("[API/ME] Processing request for user provisioning");
+    logger.LogInformation("[API/ME] Claims: {Claims}", string.Join(" | ", user.Claims.Select(c => $"{c.Type}={c.Value}")));
+    
+    // Azure Entra External ID sends email as "emails" (plural) claim
+    // Also check "email", "preferred_username", and standard ClaimTypes.Email
+    var emailClaim = user.FindFirst("emails")?.Value 
+        ?? user.FindFirst("email")?.Value 
+        ?? user.FindFirst("preferred_username")?.Value
+        ?? user.FindFirst(ClaimTypes.Email)?.Value;
+    
+    logger.LogInformation("[API/ME] Extracted email claim: {Email}", emailClaim ?? "NOT FOUND");
+    
+    if (string.IsNullOrWhiteSpace(emailClaim))
+    {
+        logger.LogWarning("[API/ME] Email claim not found in token");
+        return Results.BadRequest(new { error = "Email claim not found. Available claims: " + string.Join(", ", user.Claims.Select(c => c.Type)) });
+    }
+
+    // Try to find existing user by email
+    try
+    {
+        var existingUsers = await userService.GetAllAsync();
+        var existingUser = existingUsers.FirstOrDefault(u => u.Email.Equals(emailClaim, StringComparison.OrdinalIgnoreCase));
+        
+        if (existingUser != null)
+        {
+            logger.LogInformation("[API/ME] Found existing user: {UserId} - {Email}", existingUser.Id, existingUser.Email);
+            return Results.Ok(existingUser);
+        }
+        
+        logger.LogInformation("[API/ME] No existing user found for email: {Email}", emailClaim);
+    }
+    catch (Exception ex)
+    {
+        logger.LogWarning(ex, "[API/ME] Error looking up existing user, will attempt to create new user");
+    }
+
+    // Create new user
+    try
+    {
+        var nameClaim = user.FindFirst("name")?.Value 
+            ?? user.FindFirst(ClaimTypes.Name)?.Value 
+            ?? user.FindFirst("given_name")?.Value
+            ?? "Unknown";
+        var username = nameClaim.Replace(" ", "").ToLowerInvariant(); // Simple username generation
+        
+        logger.LogInformation("[API/ME] Creating new user - Name: {Name}, Username: {Username}, Email: {Email}", nameClaim, username, emailClaim);
+        
+        // Handle potential username conflicts by adding numbers
+        var baseUsername = username;
+        var counter = 1;
+        var allUsers = await userService.GetAllAsync();
+        
+        while (allUsers.Any(u => u.Username.Equals(username, StringComparison.OrdinalIgnoreCase)))
+        {
+            username = $"{baseUsername}{counter}";
+            counter++;
+        }
+
+        var createCommand = new CreateUserCommand(username, emailClaim);
+        var newUser = await userService.CreateAsync(createCommand);
+        
+        logger.LogInformation("[API/ME] Successfully created new user: {UserId} - {Username} - {Email}", newUser.Id, newUser.Username, newUser.Email);
+        
+        return Results.Ok(newUser);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "[API/ME] Error creating user for email: {Email}", emailClaim);
+        return Results.Problem($"Error creating user: {ex.Message}");
+    }
+})
+.WithName("GetCurrentUser")
+.RequireAuthorization();
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -90,7 +216,8 @@ app.MapGet("/api/workout-types", async (WorkoutTypeService service) =>
     var workoutTypes = await service.GetAllAsync();
     return Results.Ok(workoutTypes);
 })
-.WithName("GetAllWorkoutTypes");
+.WithName("GetAllWorkoutTypes")
+.RequireAuthorization();
 
 app.MapGet("/api/workout-types/{id}", async (string id, WorkoutTypeService service) =>
 {
@@ -104,7 +231,8 @@ app.MapGet("/api/workout-types/{id}", async (string id, WorkoutTypeService servi
         return Results.NotFound(new { error = ex.Message });
     }
 })
-.WithName("GetWorkoutTypeById");
+.WithName("GetWorkoutTypeById")
+.RequireAuthorization();
 
 app.MapPost("/api/workout-types", async (CreateWorkoutTypeCommand command, WorkoutTypeService service) =>
 {
@@ -122,7 +250,8 @@ app.MapPost("/api/workout-types", async (CreateWorkoutTypeCommand command, Worko
         return Results.BadRequest(new { error = ex.Message });
     }
 })
-.WithName("CreateWorkoutType");
+.WithName("CreateWorkoutType")
+.RequireAuthorization();
 
 app.MapPut("/api/workout-types/{id}", async (string id, UpdateWorkoutTypeCommand command, WorkoutTypeService service) =>
 {
@@ -149,7 +278,8 @@ app.MapPut("/api/workout-types/{id}", async (string id, UpdateWorkoutTypeCommand
         return Results.BadRequest(new { error = ex.Message });
     }
 })
-.WithName("UpdateWorkoutType");
+.WithName("UpdateWorkoutType")
+.RequireAuthorization();
 
 app.MapDelete("/api/workout-types/{id}", async (string id, WorkoutTypeService service) =>
 {
@@ -163,7 +293,8 @@ app.MapDelete("/api/workout-types/{id}", async (string id, WorkoutTypeService se
         return Results.NotFound(new { error = ex.Message });
     }
 })
-.WithName("DeleteWorkoutType");
+.WithName("DeleteWorkoutType")
+.RequireAuthorization();
 
 // User endpoints
 app.MapGet("/api/users", async (UserService service) =>
@@ -171,7 +302,8 @@ app.MapGet("/api/users", async (UserService service) =>
     var users = await service.GetAllAsync();
     return Results.Ok(users);
 })
-.WithName("GetAllUsers");
+.WithName("GetAllUsers")
+.RequireAuthorization();
 
 app.MapGet("/api/users/{id:guid}", async (Guid id, UserService service) =>
 {
@@ -185,7 +317,8 @@ app.MapGet("/api/users/{id:guid}", async (Guid id, UserService service) =>
         return Results.NotFound(new { error = ex.Message });
     }
 })
-.WithName("GetUserById");
+.WithName("GetUserById")
+.RequireAuthorization();
 
 app.MapPost("/api/users", async (CreateUserCommand command, UserService service) =>
 {
@@ -203,7 +336,8 @@ app.MapPost("/api/users", async (CreateUserCommand command, UserService service)
         return Results.BadRequest(new { error = ex.Message });
     }
 })
-.WithName("CreateUser");
+.WithName("CreateUser")
+.RequireAuthorization();
 
 app.MapPut("/api/users/{id:guid}", async (Guid id, UpdateUserCommand command, UserService service) =>
 {
@@ -230,7 +364,8 @@ app.MapPut("/api/users/{id:guid}", async (Guid id, UpdateUserCommand command, Us
         return Results.BadRequest(new { error = ex.Message });
     }
 })
-.WithName("UpdateUser");
+.WithName("UpdateUser")
+.RequireAuthorization();
 
 app.MapDelete("/api/users/{id:guid}", async (Guid id, UserService service) =>
 {
@@ -244,7 +379,8 @@ app.MapDelete("/api/users/{id:guid}", async (Guid id, UserService service) =>
         return Results.NotFound(new { error = ex.Message });
     }
 })
-.WithName("DeleteUser");
+.WithName("DeleteUser")
+.RequireAuthorization();
 
 // Group endpoints
 app.MapGet("/api/groups", async (GroupService service) =>
@@ -252,7 +388,8 @@ app.MapGet("/api/groups", async (GroupService service) =>
     var groups = await service.GetAllAsync();
     return Results.Ok(groups);
 })
-.WithName("GetAllGroups");
+.WithName("GetAllGroups")
+.RequireAuthorization();
 
 app.MapGet("/api/groups/{id:guid}", async (Guid id, GroupService service) =>
 {
@@ -266,7 +403,8 @@ app.MapGet("/api/groups/{id:guid}", async (Guid id, GroupService service) =>
         return Results.NotFound(new { error = ex.Message });
     }
 })
-.WithName("GetGroupById");
+.WithName("GetGroupById")
+.RequireAuthorization();
 
 app.MapPost("/api/groups", async (CreateGroupCommand command, GroupService service) =>
 {
@@ -280,7 +418,8 @@ app.MapPost("/api/groups", async (CreateGroupCommand command, GroupService servi
         return Results.BadRequest(new { error = ex.Message });
     }
 })
-.WithName("CreateGroup");
+.WithName("CreateGroup")
+.RequireAuthorization();
 
 app.MapPut("/api/groups/{id:guid}", async (Guid id, UpdateGroupCommand command, GroupService service) =>
 {
@@ -303,7 +442,8 @@ app.MapPut("/api/groups/{id:guid}", async (Guid id, UpdateGroupCommand command, 
         return Results.BadRequest(new { error = ex.Message });
     }
 })
-.WithName("UpdateGroup");
+.WithName("UpdateGroup")
+.RequireAuthorization();
 
 app.MapDelete("/api/groups/{id:guid}", async (Guid id, GroupService service) =>
 {
@@ -317,7 +457,8 @@ app.MapDelete("/api/groups/{id:guid}", async (Guid id, GroupService service) =>
         return Results.NotFound(new { error = ex.Message });
     }
 })
-.WithName("DeleteGroup");
+.WithName("DeleteGroup")
+.RequireAuthorization();
 
 // GroupMembership endpoints
 app.MapGet("/api/group-memberships", async (GroupMembershipService service) =>
@@ -325,7 +466,8 @@ app.MapGet("/api/group-memberships", async (GroupMembershipService service) =>
     var memberships = await service.GetAllAsync();
     return Results.Ok(memberships);
 })
-.WithName("GetAllGroupMemberships");
+.WithName("GetAllGroupMemberships")
+.RequireAuthorization();
 
 app.MapGet("/api/group-memberships/{id:guid}", async (Guid id, GroupMembershipService service) =>
 {
@@ -339,21 +481,24 @@ app.MapGet("/api/group-memberships/{id:guid}", async (Guid id, GroupMembershipSe
         return Results.NotFound(new { error = ex.Message });
     }
 })
-.WithName("GetGroupMembershipById");
+.WithName("GetGroupMembershipById")
+.RequireAuthorization();
 
 app.MapGet("/api/groups/{groupId:guid}/memberships", async (Guid groupId, GroupMembershipService service) =>
 {
     var memberships = await service.GetByGroupIdAsync(groupId);
     return Results.Ok(memberships);
 })
-.WithName("GetGroupMembershipsByGroupId");
+.WithName("GetGroupMembershipsByGroupId")
+.RequireAuthorization();
 
 app.MapGet("/api/users/{userId:guid}/memberships", async (Guid userId, GroupMembershipService service) =>
 {
     var memberships = await service.GetByUserIdAsync(userId);
     return Results.Ok(memberships);
 })
-.WithName("GetGroupMembershipsByUserId");
+.WithName("GetGroupMembershipsByUserId")
+.RequireAuthorization();
 
 app.MapPost("/api/group-memberships", async (CreateGroupMembershipCommand command, GroupMembershipService service) =>
 {
@@ -375,7 +520,8 @@ app.MapPost("/api/group-memberships", async (CreateGroupMembershipCommand comman
         return Results.BadRequest(new { error = ex.Message });
     }
 })
-.WithName("CreateGroupMembership");
+.WithName("CreateGroupMembership")
+.RequireAuthorization();
 
 app.MapPut("/api/group-memberships/{id:guid}", async (Guid id, UpdateGroupMembershipCommand command, GroupMembershipService service) =>
 {
@@ -398,7 +544,8 @@ app.MapPut("/api/group-memberships/{id:guid}", async (Guid id, UpdateGroupMember
         return Results.BadRequest(new { error = ex.Message });
     }
 })
-.WithName("UpdateGroupMembership");
+.WithName("UpdateGroupMembership")
+.RequireAuthorization();
 
 app.MapDelete("/api/group-memberships/{id:guid}", async (Guid id, GroupMembershipService service) =>
 {
@@ -412,7 +559,8 @@ app.MapDelete("/api/group-memberships/{id:guid}", async (Guid id, GroupMembershi
         return Results.NotFound(new { error = ex.Message });
     }
 })
-.WithName("DeleteGroupMembership");
+.WithName("DeleteGroupMembership")
+.RequireAuthorization();
 
 // WorkoutSession endpoints
 app.MapGet("/api/workout-sessions", async (WorkoutSessionService service) =>
@@ -420,7 +568,8 @@ app.MapGet("/api/workout-sessions", async (WorkoutSessionService service) =>
     var sessions = await service.GetAllAsync();
     return Results.Ok(sessions);
 })
-.WithName("GetAllWorkoutSessions");
+.WithName("GetAllWorkoutSessions")
+.RequireAuthorization();
 
 app.MapGet("/api/workout-sessions/{id:guid}", async (Guid id, WorkoutSessionService service) =>
 {
@@ -434,21 +583,24 @@ app.MapGet("/api/workout-sessions/{id:guid}", async (Guid id, WorkoutSessionServ
         return Results.NotFound(new { error = ex.Message });
     }
 })
-.WithName("GetWorkoutSessionById");
+.WithName("GetWorkoutSessionById")
+.RequireAuthorization();
 
 app.MapGet("/api/groups/{groupId:guid}/workout-sessions", async (Guid groupId, WorkoutSessionService service) =>
 {
     var sessions = await service.GetByGroupIdAsync(groupId);
     return Results.Ok(sessions);
 })
-.WithName("GetWorkoutSessionsByGroupId");
+.WithName("GetWorkoutSessionsByGroupId")
+.RequireAuthorization();
 
 app.MapGet("/api/users/{creatorId:guid}/workout-sessions", async (Guid creatorId, WorkoutSessionService service) =>
 {
     var sessions = await service.GetByCreatorIdAsync(creatorId);
     return Results.Ok(sessions);
 })
-.WithName("GetWorkoutSessionsByCreatorId");
+.WithName("GetWorkoutSessionsByCreatorId")
+.RequireAuthorization();
 
 app.MapPost("/api/workout-sessions", async (CreateWorkoutSessionCommand command, WorkoutSessionService service) =>
 {
@@ -462,7 +614,8 @@ app.MapPost("/api/workout-sessions", async (CreateWorkoutSessionCommand command,
         return Results.NotFound(new { error = ex.Message });
     }
 })
-.WithName("CreateWorkoutSession");
+.WithName("CreateWorkoutSession")
+.RequireAuthorization();
 
 app.MapPut("/api/workout-sessions/{id:guid}", async (Guid id, UpdateWorkoutSessionCommand command, WorkoutSessionService service) =>
 {
@@ -481,7 +634,8 @@ app.MapPut("/api/workout-sessions/{id:guid}", async (Guid id, UpdateWorkoutSessi
         return Results.NotFound(new { error = ex.Message });
     }
 })
-.WithName("UpdateWorkoutSession");
+.WithName("UpdateWorkoutSession")
+.RequireAuthorization();
 
 app.MapDelete("/api/workout-sessions/{id:guid}", async (Guid id, WorkoutSessionService service) =>
 {
@@ -495,7 +649,8 @@ app.MapDelete("/api/workout-sessions/{id:guid}", async (Guid id, WorkoutSessionS
         return Results.NotFound(new { error = ex.Message });
     }
 })
-.WithName("DeleteWorkoutSession");
+.WithName("DeleteWorkoutSession")
+.RequireAuthorization();
 
 // WorkoutSession control endpoints
 app.MapPost("/api/workout-sessions/{id:guid}/start", async (Guid id, WorkoutSessionService service) =>
@@ -515,7 +670,8 @@ app.MapPost("/api/workout-sessions/{id:guid}/start", async (Guid id, WorkoutSess
         return Results.BadRequest(new { error = ex.Message });
     }
 })
-.WithName("StartWorkoutSession");
+.WithName("StartWorkoutSession")
+.RequireAuthorization();
 
 app.MapPost("/api/workout-sessions/{id:guid}/cancel", async (Guid id, WorkoutSessionService service) =>
 {
@@ -534,7 +690,8 @@ app.MapPost("/api/workout-sessions/{id:guid}/cancel", async (Guid id, WorkoutSes
         return Results.BadRequest(new { error = ex.Message });
     }
 })
-.WithName("CancelWorkoutSession");
+.WithName("CancelWorkoutSession")
+.RequireAuthorization();
 
 app.MapPost("/api/workout-sessions/{id:guid}/complete", async (Guid id, WorkoutSessionService service) =>
 {
@@ -553,7 +710,8 @@ app.MapPost("/api/workout-sessions/{id:guid}/complete", async (Guid id, WorkoutS
         return Results.BadRequest(new { error = ex.Message });
     }
 })
-.WithName("CompleteWorkoutSession");
+.WithName("CompleteWorkoutSession")
+.RequireAuthorization();
 
 app.MapGet("/api/groups/{groupId:guid}/active-session", async (Guid groupId, WorkoutSessionService service) =>
 {
@@ -564,7 +722,8 @@ app.MapGet("/api/groups/{groupId:guid}/active-session", async (Guid groupId, Wor
     }
     return Results.Ok(session);
 })
-.WithName("GetActiveWorkoutSession");
+.WithName("GetActiveWorkoutSession")
+.RequireAuthorization();
 
 app.MapGet("/api/workout-sessions/{id:guid}/assignments", async (Guid id, WorkoutSessionService service, WorkoutTypeService workoutTypeService) =>
 {
@@ -607,7 +766,8 @@ app.MapGet("/api/workout-sessions/{id:guid}/assignments", async (Guid id, Workou
         return Results.NotFound(new { error = ex.Message });
     }
 })
-.WithName("GetWorkoutSessionAssignments");
+.WithName("GetWorkoutSessionAssignments")
+.RequireAuthorization();
 
 
 // WorkoutSessionWorkoutType endpoints
@@ -616,7 +776,8 @@ app.MapGet("/api/workout-session-workout-types", async (WorkoutSessionWorkoutTyp
     var items = await service.GetAllAsync();
     return Results.Ok(items);
 })
-.WithName("GetAllWorkoutSessionWorkoutTypes");
+.WithName("GetAllWorkoutSessionWorkoutTypes")
+.RequireAuthorization();
 
 app.MapGet("/api/workout-session-workout-types/{id:guid}", async (Guid id, WorkoutSessionWorkoutTypeService service) =>
 {
@@ -630,14 +791,16 @@ app.MapGet("/api/workout-session-workout-types/{id:guid}", async (Guid id, Worko
         return Results.NotFound(new { error = ex.Message });
     }
 })
-.WithName("GetWorkoutSessionWorkoutTypeById");
+.WithName("GetWorkoutSessionWorkoutTypeById")
+.RequireAuthorization();
 
 app.MapGet("/api/workout-sessions/{workoutSessionId:guid}/workout-types", async (Guid workoutSessionId, WorkoutSessionWorkoutTypeService service) =>
 {
     var items = await service.GetByWorkoutSessionIdAsync(workoutSessionId);
     return Results.Ok(items);
 })
-.WithName("GetWorkoutSessionWorkoutTypesBySessionId");
+.WithName("GetWorkoutSessionWorkoutTypesBySessionId")
+.RequireAuthorization();
 
 app.MapPost("/api/workout-session-workout-types", async (CreateWorkoutSessionWorkoutTypeCommand command, WorkoutSessionWorkoutTypeService service) =>
 {
@@ -655,7 +818,8 @@ app.MapPost("/api/workout-session-workout-types", async (CreateWorkoutSessionWor
         return Results.BadRequest(new { error = ex.Message });
     }
 })
-.WithName("CreateWorkoutSessionWorkoutType");
+.WithName("CreateWorkoutSessionWorkoutType")
+.RequireAuthorization();
 
 app.MapPut("/api/workout-session-workout-types/{id:guid}", async (Guid id, UpdateWorkoutSessionWorkoutTypeCommand command, WorkoutSessionWorkoutTypeService service) =>
 {
@@ -678,7 +842,8 @@ app.MapPut("/api/workout-session-workout-types/{id:guid}", async (Guid id, Updat
         return Results.BadRequest(new { error = ex.Message });
     }
 })
-.WithName("UpdateWorkoutSessionWorkoutType");
+.WithName("UpdateWorkoutSessionWorkoutType")
+.RequireAuthorization();
 
 app.MapDelete("/api/workout-session-workout-types/{id:guid}", async (Guid id, WorkoutSessionWorkoutTypeService service) =>
 {
@@ -692,7 +857,8 @@ app.MapDelete("/api/workout-session-workout-types/{id:guid}", async (Guid id, Wo
         return Results.NotFound(new { error = ex.Message });
     }
 })
-.WithName("DeleteWorkoutSessionWorkoutType");
+.WithName("DeleteWorkoutSessionWorkoutType")
+.RequireAuthorization();
 
 // WorkoutSessionParticipant endpoints
 app.MapGet("/api/workout-session-participants", async (WorkoutSessionParticipantService service) =>
@@ -700,7 +866,8 @@ app.MapGet("/api/workout-session-participants", async (WorkoutSessionParticipant
     var participants = await service.GetAllAsync();
     return Results.Ok(participants);
 })
-.WithName("GetAllWorkoutSessionParticipants");
+.WithName("GetAllWorkoutSessionParticipants")
+.RequireAuthorization();
 
 app.MapGet("/api/workout-session-participants/{id:guid}", async (Guid id, WorkoutSessionParticipantService service) =>
 {
@@ -714,21 +881,24 @@ app.MapGet("/api/workout-session-participants/{id:guid}", async (Guid id, Workou
         return Results.NotFound(new { error = ex.Message });
     }
 })
-.WithName("GetWorkoutSessionParticipantById");
+.WithName("GetWorkoutSessionParticipantById")
+.RequireAuthorization();
 
 app.MapGet("/api/workout-sessions/{workoutSessionId:guid}/participants", async (Guid workoutSessionId, WorkoutSessionParticipantService service) =>
 {
     var participants = await service.GetByWorkoutSessionIdAsync(workoutSessionId);
     return Results.Ok(participants);
 })
-.WithName("GetWorkoutSessionParticipantsBySessionId");
+.WithName("GetWorkoutSessionParticipantsBySessionId")
+.RequireAuthorization();
 
 app.MapGet("/api/users/{userId:guid}/participations", async (Guid userId, WorkoutSessionParticipantService service) =>
 {
     var participants = await service.GetByUserIdAsync(userId);
     return Results.Ok(participants);
 })
-.WithName("GetWorkoutSessionParticipantsByUserId");
+.WithName("GetWorkoutSessionParticipantsByUserId")
+.RequireAuthorization();
 
 app.MapPost("/api/workout-session-participants", async (CreateWorkoutSessionParticipantCommand command, WorkoutSessionParticipantService service) =>
 {
@@ -746,7 +916,8 @@ app.MapPost("/api/workout-session-participants", async (CreateWorkoutSessionPart
         return Results.BadRequest(new { error = ex.Message });
     }
 })
-.WithName("CreateWorkoutSessionParticipant");
+.WithName("CreateWorkoutSessionParticipant")
+.RequireAuthorization();
 
 app.MapPut("/api/workout-session-participants/{id:guid}", async (Guid id, UpdateWorkoutSessionParticipantCommand command, WorkoutSessionParticipantService service) =>
 {
@@ -769,7 +940,8 @@ app.MapPut("/api/workout-session-participants/{id:guid}", async (Guid id, Update
         return Results.BadRequest(new { error = ex.Message });
     }
 })
-.WithName("UpdateWorkoutSessionParticipant");
+.WithName("UpdateWorkoutSessionParticipant")
+.RequireAuthorization();
 
 app.MapDelete("/api/workout-session-participants/{id:guid}", async (Guid id, WorkoutSessionParticipantService service) =>
 {
@@ -783,7 +955,8 @@ app.MapDelete("/api/workout-session-participants/{id:guid}", async (Guid id, Wor
         return Results.NotFound(new { error = ex.Message });
     }
 })
-.WithName("DeleteWorkoutSessionParticipant");
+.WithName("DeleteWorkoutSessionParticipant")
+.RequireAuthorization();
 
 // WorkoutIntervalScore endpoints
 app.MapGet("/api/workout-interval-scores", async (WorkoutIntervalScoreService service) =>
@@ -791,7 +964,8 @@ app.MapGet("/api/workout-interval-scores", async (WorkoutIntervalScoreService se
     var scores = await service.GetAllAsync();
     return Results.Ok(scores);
 })
-.WithName("GetAllWorkoutIntervalScores");
+.WithName("GetAllWorkoutIntervalScores")
+.RequireAuthorization();
 
 app.MapGet("/api/workout-interval-scores/{id:guid}", async (Guid id, WorkoutIntervalScoreService service) =>
 {
@@ -805,21 +979,24 @@ app.MapGet("/api/workout-interval-scores/{id:guid}", async (Guid id, WorkoutInte
         return Results.NotFound(new { error = ex.Message });
     }
 })
-.WithName("GetWorkoutIntervalScoreById");
+.WithName("GetWorkoutIntervalScoreById")
+.RequireAuthorization();
 
 app.MapGet("/api/workout-session-participants/{participantId:guid}/scores", async (Guid participantId, WorkoutIntervalScoreService service) =>
 {
     var scores = await service.GetByParticipantIdAsync(participantId);
     return Results.Ok(scores);
 })
-.WithName("GetWorkoutIntervalScoresByParticipantId");
+.WithName("GetWorkoutIntervalScoresByParticipantId")
+.RequireAuthorization();
 
 app.MapGet("/api/workout-types/{workoutTypeId}/scores", async (string workoutTypeId, WorkoutIntervalScoreService service) =>
 {
     var scores = await service.GetByWorkoutTypeIdAsync(workoutTypeId);
     return Results.Ok(scores);
 })
-.WithName("GetWorkoutIntervalScoresByWorkoutTypeId");
+.WithName("GetWorkoutIntervalScoresByWorkoutTypeId")
+.RequireAuthorization();
 
 app.MapPost("/api/workout-interval-scores", async (CreateWorkoutIntervalScoreCommand command, WorkoutIntervalScoreService service) =>
 {
@@ -837,7 +1014,8 @@ app.MapPost("/api/workout-interval-scores", async (CreateWorkoutIntervalScoreCom
         return Results.BadRequest(new { error = ex.Message });
     }
 })
-.WithName("CreateWorkoutIntervalScore");
+.WithName("CreateWorkoutIntervalScore")
+.RequireAuthorization();
 
 app.MapPut("/api/workout-interval-scores/{id:guid}", async (Guid id, UpdateWorkoutIntervalScoreCommand command, WorkoutIntervalScoreService service) =>
 {
@@ -860,7 +1038,8 @@ app.MapPut("/api/workout-interval-scores/{id:guid}", async (Guid id, UpdateWorko
         return Results.BadRequest(new { error = ex.Message });
     }
 })
-.WithName("UpdateWorkoutIntervalScore");
+.WithName("UpdateWorkoutIntervalScore")
+.RequireAuthorization();
 
 app.MapDelete("/api/workout-interval-scores/{id:guid}", async (Guid id, WorkoutIntervalScoreService service) =>
 {
@@ -874,6 +1053,9 @@ app.MapDelete("/api/workout-interval-scores/{id:guid}", async (Guid id, WorkoutI
         return Results.NotFound(new { error = ex.Message });
     }
 })
-.WithName("DeleteWorkoutIntervalScore");
+.WithName("DeleteWorkoutIntervalScore")
+.RequireAuthorization();
 
 app.Run();
+
+public partial class Program { }

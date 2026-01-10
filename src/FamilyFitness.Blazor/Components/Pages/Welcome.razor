@@ -1,0 +1,117 @@
+@page "/"
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Navigation
+
+<PageTitle>FFWOD - Family Fitness Workout of the Day</PageTitle>
+
+<div class="welcome-container">
+    <div class="hero-section">
+        <h1 class="display-1">FFWOD</h1>
+        <p class="lead">Family Fitness Workout of the Day</p>
+        <p class="fs-5">Get fit together as a family with daily workouts, progress tracking, and friendly competition!</p>
+    </div>
+
+    <AuthorizeView>
+        <Authorized>
+            <div class="card">
+                <div class="card-body text-center">
+                    <h3>Welcome back!</h3>
+                    <p>Ready to continue your fitness journey?</p>
+                    <a href="/home" class="btn btn-primary btn-lg">Go to Dashboard</a>
+                </div>
+            </div>
+        </Authorized>
+        <NotAuthorized>
+            <div class="info-section mt-4">
+                <div class="alert alert-info">
+                    <h5>👋 First time here?</h5>
+                    <p class="mb-2">When you click "Get Started", you'll be taken to our secure authentication page.</p>
+                    <ul class="mb-0 text-start">
+                        <li><strong>New users:</strong> Look for "Create account", "Sign up now", or similar link</li>
+                        <li><strong>Existing users:</strong> Simply enter your credentials to sign in</li>
+                        <li><strong>Need API access?</strong> <a href="/consent">Click here to grant permissions</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="row g-4 mt-4">
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <h3>Existing Member?</h3>
+                            <p>Sign in to continue your fitness journey and track your progress.</p>
+                            <a href="/signin" class="btn btn-primary btn-lg">Sign In</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <h3>New to FFWOD?</h3>
+                            <p>Create your account and start your family fitness adventure today!</p>
+                            <p><small class="text-muted">New users: Look for the "Create account" or "Sign up now" link on the authentication page.</small></p>
+                            <a href="/signup" class="btn btn-success btn-lg">Get Started</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="features-section mt-5">
+                <h2 class="text-center mb-4">Why Choose FFWOD?</h2>
+                <div class="row g-4">
+                    <div class="col-md-4">
+                        <div class="text-center">
+                            <h4>Daily Workouts</h4>
+                            <p>Fresh, engaging workouts designed for the whole family.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center">
+                            <h4>Track Progress</h4>
+                            <p>Monitor your fitness journey with detailed statistics and insights.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center">
+                            <h4>Family Fun</h4>
+                            <p>Compete with family members and celebrate achievements together.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </NotAuthorized>
+    </AuthorizeView>
+</div>
+
+<style>
+    .welcome-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 2rem;
+    }
+
+    .hero-section {
+        text-align: center;
+        margin-bottom: 3rem;
+    }
+
+    .features-section {
+        margin-top: 4rem;
+    }
+
+    .card {
+        border: none;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        transition: transform 0.2s;
+    }
+
+    .card:hover {
+        transform: translateY(-2px);
+    }
+
+    .btn-lg {
+        padding: 0.75rem 2rem;
+        font-size: 1.1rem;
+    }
+</style>

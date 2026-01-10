@@ -1,6 +1,8 @@
-@page "/"
+@page "/home"
+@attribute [Authorize]
 @using System.Net.Http.Json
 @using FamilyFitness.Blazor.Models
+@using Microsoft.AspNetCore.Authorization
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @rendermode InteractiveServer
@@ -13,7 +15,16 @@
 
     @if (error != null)
     {
-        <div class="alert alert-danger">@error</div>
+        <div class="alert alert-danger">
+            @error
+            @if (error.Contains("401") || error.Contains("Unauthorized"))
+            {
+                <div class="mt-2">
+                    <p><strong>Authentication issue detected.</strong> This usually means you need to grant API access permissions.</p>
+                    <a href="/consent" class="btn btn-warning btn-sm">Grant API Access</a>
+                </div>
+            }
+        </div>
     }
 
     @if (loading)
@@ -73,11 +84,22 @@
             {
                 activeSession = await response.Content.ReadFromJsonAsync<SessionDto>();
             }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                error = "Failed to load data: Response status code does not indicate success: 401 (Unauthorized).";
+            }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // No active session or error - that's okay
-            activeSession = null;
+            if (ex.Message.Contains("401") || ex.Message.Contains("Unauthorized"))
+            {
+                error = "Failed to load data: Response status code does not indicate success: 401 (Unauthorized).";
+            }
+            else
+            {
+                // No active session or other error - that's okay for home page
+                activeSession = null;
+            }
         }
         finally
         {
