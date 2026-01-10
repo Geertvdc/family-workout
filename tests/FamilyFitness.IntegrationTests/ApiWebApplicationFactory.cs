@@ -49,9 +49,16 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>
     {
         if (disposing)
         {
-            using var scope = Services.CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<FamilyFitnessDbContext>();
-            context.Database.EnsureDeleted();
+            try
+            {
+                using var scope = Services.CreateScope();
+                var context = scope.ServiceProvider.GetRequiredService<FamilyFitnessDbContext>();
+                context.Database.EnsureDeleted();
+            }
+            catch (ObjectDisposedException)
+            {
+                // Service provider already disposed, nothing to clean up
+            }
         }
         base.Dispose(disposing);
     }
