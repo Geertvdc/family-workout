@@ -1,5 +1,6 @@
 @page "/workout-types"
 @using System.Net.Http.Json
+@using FamilyFitness.Blazor.Models
 @inject HttpClient Http
 @rendermode InteractiveServer
 
@@ -161,21 +162,9 @@ else
         }
     }
 
-    public class WorkoutTypeDto
-    {
-        public string Id { get; set; } = string.Empty;
-        public string Name { get; set; } = string.Empty;
-        public string? Description { get; set; }
-    }
-
     public class CreateWorkoutTypeModel
     {
         public string Name { get; set; } = string.Empty;
         public string? Description { get; set; }
-    }
-
-    public class ErrorResponse
-    {
-        public string error { get; set; } = string.Empty;
     }
 }

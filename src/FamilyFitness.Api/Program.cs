@@ -83,17 +83,7 @@ var app = builder.Build();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Debug endpoint to check API authentication
-app.MapGet("/api/debug/auth", (ClaimsPrincipal user) =>
-{
-    return new
-    {
-        IsAuthenticated = user.Identity?.IsAuthenticated,
-        AuthenticationType = user.Identity?.AuthenticationType,
-        Name = user.Identity?.Name,
-        Claims = user.Claims.Select(c => new { c.Type, c.Value }).ToList()
-    };
-}).RequireAuthorization();
+
 
 // Ensure database is created and seeded (for Development)
 if (app.Environment.IsDevelopment())
@@ -597,7 +587,7 @@ app.MapPut("/api/groups/{id:guid}", async (Guid id, UpdateGroupCommand command, 
     {
         return Results.NotFound(new { error = ex.Message });
     }
-    catch (UnauthorizedAccessException ex)
+    catch (UnauthorizedAccessException)
     {
         return Results.Forbid();
     }
@@ -626,7 +616,7 @@ app.MapDelete("/api/groups/{id:guid}", async (Guid id, ClaimsPrincipal user, Gro
     {
         return Results.NotFound(new { error = ex.Message });
     }
-    catch (UnauthorizedAccessException ex)
+    catch (UnauthorizedAccessException)
     {
         return Results.Forbid();
     }
@@ -653,7 +643,7 @@ app.MapPost("/api/groups/{groupId:guid}/invites", async (Guid groupId, ClaimsPri
     {
         return Results.NotFound(new { error = ex.Message });
     }
-    catch (UnauthorizedAccessException ex)
+    catch (UnauthorizedAccessException)
     {
         return Results.Forbid();
     }
@@ -678,7 +668,7 @@ app.MapGet("/api/groups/{groupId:guid}/invites", async (Guid groupId, ClaimsPrin
     {
         return Results.NotFound(new { error = ex.Message });
     }
-    catch (UnauthorizedAccessException ex)
+    catch (UnauthorizedAccessException)
     {
         return Results.Forbid();
     }
@@ -734,7 +724,7 @@ app.MapDelete("/api/invites/{id:guid}", async (Guid id, ClaimsPrincipal user, Gr
     {
         return Results.NotFound(new { error = ex.Message });
     }
-    catch (UnauthorizedAccessException ex)
+    catch (UnauthorizedAccessException)
     {
         return Results.Forbid();
     }
@@ -766,21 +756,7 @@ app.MapGet("/api/group-memberships/{id:guid}", async (Guid id, GroupMembershipSe
 .WithName("GetGroupMembershipById")
 .RequireAuthorization();
 
-app.MapGet("/api/groups/{groupId:guid}/memberships", async (Guid groupId, GroupMembershipService service) =>
-{
-    var memberships = await service.GetByGroupIdAsync(groupId);
-    return Results.Ok(memberships);
-})
-.WithName("GetGroupMembershipsByGroupId")
-.RequireAuthorization();
 
-app.MapGet("/api/users/{userId:guid}/memberships", async (Guid userId, GroupMembershipService service) =>
-{
-    var memberships = await service.GetByUserIdAsync(userId);
-    return Results.Ok(memberships);
-})
-.WithName("GetGroupMembershipsByUserId")
-.RequireAuthorization();
 
 app.MapPost("/api/group-memberships", async (CreateGroupMembershipCommand command, GroupMembershipService service) =>
 {
@@ -868,21 +844,8 @@ app.MapGet("/api/workout-sessions/{id:guid}", async (Guid id, WorkoutSessionServ
 .WithName("GetWorkoutSessionById")
 .RequireAuthorization();
 
-app.MapGet("/api/groups/{groupId:guid}/workout-sessions", async (Guid groupId, WorkoutSessionService service) =>
-{
-    var sessions = await service.GetByGroupIdAsync(groupId);
-    return Results.Ok(sessions);
-})
-.WithName("GetWorkoutSessionsByGroupId")
-.RequireAuthorization();
 
-app.MapGet("/api/users/{creatorId:guid}/workout-sessions", async (Guid creatorId, WorkoutSessionService service) =>
-{
-    var sessions = await service.GetByCreatorIdAsync(creatorId);
-    return Results.Ok(sessions);
-})
-.WithName("GetWorkoutSessionsByCreatorId")
-.RequireAuthorization();
+
 
 app.MapPost("/api/workout-sessions", async (CreateWorkoutSessionCommand command, WorkoutSessionService service) =>
 {
@@ -1076,13 +1039,6 @@ app.MapGet("/api/workout-session-workout-types/{id:guid}", async (Guid id, Worko
 .WithName("GetWorkoutSessionWorkoutTypeById")
 .RequireAuthorization();
 
-app.MapGet("/api/workout-sessions/{workoutSessionId:guid}/workout-types", async (Guid workoutSessionId, WorkoutSessionWorkoutTypeService service) =>
-{
-    var items = await service.GetByWorkoutSessionIdAsync(workoutSessionId);
-    return Results.Ok(items);
-})
-.WithName("GetWorkoutSessionWorkoutTypesBySessionId")
-.RequireAuthorization();
 
 app.MapPost("/api/workout-session-workout-types", async (CreateWorkoutSessionWorkoutTypeCommand command, WorkoutSessionWorkoutTypeService service) =>
 {
@@ -1166,21 +1122,7 @@ app.MapGet("/api/workout-session-participants/{id:guid}", async (Guid id, Workou
 .WithName("GetWorkoutSessionParticipantById")
 .RequireAuthorization();
 
-app.MapGet("/api/workout-sessions/{workoutSessionId:guid}/participants", async (Guid workoutSessionId, WorkoutSessionParticipantService service) =>
-{
-    var participants = await service.GetByWorkoutSessionIdAsync(workoutSessionId);
-    return Results.Ok(participants);
-})
-.WithName("GetWorkoutSessionParticipantsBySessionId")
-.RequireAuthorization();
 
-app.MapGet("/api/users/{userId:guid}/participations", async (Guid userId, WorkoutSessionParticipantService service) =>
-{
-    var participants = await service.GetByUserIdAsync(userId);
-    return Results.Ok(participants);
-})
-.WithName("GetWorkoutSessionParticipantsByUserId")
-.RequireAuthorization();
 
 app.MapPost("/api/workout-session-participants", async (CreateWorkoutSessionParticipantCommand command, WorkoutSessionParticipantService service) =>
 {
@@ -1264,21 +1206,7 @@ app.MapGet("/api/workout-interval-scores/{id:guid}", async (Guid id, WorkoutInte
 .WithName("GetWorkoutIntervalScoreById")
 .RequireAuthorization();
 
-app.MapGet("/api/workout-session-participants/{participantId:guid}/scores", async (Guid participantId, WorkoutIntervalScoreService service) =>
-{
-    var scores = await service.GetByParticipantIdAsync(participantId);
-    return Results.Ok(scores);
-})
-.WithName("GetWorkoutIntervalScoresByParticipantId")
-.RequireAuthorization();
 
-app.MapGet("/api/workout-types/{workoutTypeId}/scores", async (string workoutTypeId, WorkoutIntervalScoreService service) =>
-{
-    var scores = await service.GetByWorkoutTypeIdAsync(workoutTypeId);
-    return Results.Ok(scores);
-})
-.WithName("GetWorkoutIntervalScoresByWorkoutTypeId")
-.RequireAuthorization();
 
 app.MapPost("/api/workout-interval-scores", async (CreateWorkoutIntervalScoreCommand command, WorkoutIntervalScoreService service) =>
 {

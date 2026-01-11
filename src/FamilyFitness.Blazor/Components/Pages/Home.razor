@@ -60,12 +60,12 @@
 </div>
 
 @code {
-    private SessionDto? activeSession;
+    private WorkoutSessionDto? activeSession;
     private bool loading = true;
     private string? error;
 
     // Hardcoded group ID for MVP - in production this would come from user context (matches seeded data)
-    private readonly Guid defaultGroupId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+    private readonly Guid defaultGroupId = AppConstants.DefaultGroupId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -82,7 +82,7 @@
             var response = await Http.GetAsync($"/api/groups/{defaultGroupId}/active-session");
             if (response.IsSuccessStatusCode)
             {
-                activeSession = await response.Content.ReadFromJsonAsync<SessionDto>();
+                activeSession = await response.Content.ReadFromJsonAsync<WorkoutSessionDto>();
             }
             else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {

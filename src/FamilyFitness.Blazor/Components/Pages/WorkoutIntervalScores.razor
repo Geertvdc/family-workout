@@ -1,5 +1,6 @@
 @page "/workout-interval-scores"
 @using System.Net.Http.Json
+@using FamilyFitness.Blazor.Models
 @inject HttpClient Http
 @rendermode InteractiveServer
 
@@ -255,18 +256,6 @@ else
         }
     }
 
-    public class WorkoutIntervalScoreDto
-    {
-        public Guid Id { get; set; }
-        public Guid ParticipantId { get; set; }
-        public int RoundNumber { get; set; }
-        public int StationIndex { get; set; }
-        public string WorkoutTypeId { get; set; } = string.Empty;
-        public int Score { get; set; }
-        public decimal? Weight { get; set; }
-        public DateTime RecordedAt { get; set; }
-    }
-
     public class CreateWorkoutIntervalScoreModel
     {
         public string ParticipantId { get; set; } = string.Empty;
@@ -276,25 +265,5 @@ else
         public int Score { get; set; } = 0;
         public decimal? Weight { get; set; }
     }
-
-    public class WorkoutSessionParticipantDto
-    {
-        public Guid Id { get; set; }
-        public Guid WorkoutSessionId { get; set; }
-        public Guid UserId { get; set; }
-        public int ParticipantIndex { get; set; }
-        public DateTime JoinedAt { get; set; }
-    }
-
-    public class WorkoutTypeDto
-    {
-        public string Id { get; set; } = string.Empty;
-        public string Name { get; set; } = string.Empty;
-        public string? Description { get; set; }
-    }
-
-    public class ErrorResponse
-    {
-        public string error { get; set; } = string.Empty;
-    }
 }
+

@@ -6,30 +6,17 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace FamilyFitness.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialWorkoutDataModel : Migration
+    public partial class AddUserEntraObjectId : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
-                name: "groups",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    Name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    Description = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_groups", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "users",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    EntraObjectId = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
                     Username = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     Email = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
@@ -50,6 +37,48 @@ namespace FamilyFitness.Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_workout_types", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "groups",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    Description = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    OwnerId = table.Column<Guid>(type: "uuid", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_groups", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_groups_users_OwnerId",
+                        column: x => x.OwnerId,
+                        principalTable: "users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "group_invites",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    GroupId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Token = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    IsActive = table.Column<bool>(type: "boolean", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_group_invites", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_group_invites_groups_GroupId",
+                        column: x => x.GroupId,
+                        principalTable: "groups",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -185,6 +214,17 @@ namespace FamilyFitness.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateIndex(
+                name: "IX_group_invites_GroupId",
+                table: "group_invites",
+                column: "GroupId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_group_invites_Token",
+                table: "group_invites",
+                column: "Token",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_group_memberships_GroupId_UserId",
                 table: "group_memberships",
                 columns: new[] { "GroupId", "UserId" },
@@ -196,10 +236,22 @@ namespace FamilyFitness.Infrastructure.Migrations
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_groups_OwnerId",
+                table: "groups",
+                column: "OwnerId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_users_Email",
                 table: "users",
                 column: "Email",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_users_EntraObjectId",
+                table: "users",
+                column: "EntraObjectId",
+                unique: true,
+                filter: "\"EntraObjectId\" IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_users_Username",
@@ -261,6 +313,9 @@ namespace FamilyFitness.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropTable(
+                name: "group_invites");
+
             migrationBuilder.DropTable(
                 name: "group_memberships");
 

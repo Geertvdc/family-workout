@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FamilyFitness.Infrastructure.Migrations
 {
     [DbContext(typeof(FamilyFitnessDbContext))]
-    [Migration("20260110183307_AddUserEntraObjectId")]
+    [Migration("20260111160103_AddUserEntraObjectId")]
     partial class AddUserEntraObjectId
     {
         /// <inheritdoc />
