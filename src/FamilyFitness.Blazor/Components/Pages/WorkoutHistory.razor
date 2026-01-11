@@ -217,11 +217,11 @@
     
     private List<GroupDto>? userGroups;
     private List<WorkoutSessionDto>? workoutSessions;
-    private Dictionary<Guid, List<WorkoutSessionWorkoutTypeDto>> sessionWorkoutTypes = new();
-    private Dictionary<Guid, List<WorkoutSessionParticipantDto>> sessionParticipants = new();
-    private Dictionary<Guid, List<WorkoutIntervalScoreDto>> sessionScores = new();
-    private Dictionary<Guid, int> sessionCounts = new();
-    private HashSet<Guid> expandedSessions = new();
+    private readonly Dictionary<Guid, List<WorkoutSessionWorkoutTypeDto>> sessionWorkoutTypes = new();
+    private readonly Dictionary<Guid, List<WorkoutSessionParticipantDto>> sessionParticipants = new();
+    private readonly Dictionary<Guid, List<WorkoutIntervalScoreDto>> sessionScores = new();
+    private readonly Dictionary<Guid, int> sessionCounts = new();
+    private readonly HashSet<Guid> expandedSessions = new();
     private Guid? selectedGroupId;
     private bool isLoading = false;
     private string? errorMessage;
@@ -394,13 +394,8 @@
     private string GetDurationText(DateTime start, DateTime end)
     {
         var duration = end - start;
-        if (duration.TotalHours >= 1)
-        {
-            return $"{duration.Hours}h {duration.Minutes}m";
-        }
-        else
-        {
-            return $"{duration.Minutes}m";
-        }
+        return duration.TotalHours >= 1
+            ? $"{duration.Hours}h {duration.Minutes}m"
+            : $"{duration.Minutes}m";
     }
 }

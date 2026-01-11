@@ -314,7 +314,7 @@
     {
         try
         {
-            var members = await Http.GetFromJsonAsync<List<GroupMembershipDto>>($"/api/groups/{groupId}/members");
+            var members = await Http.GetFromJsonAsync<List<UserDto>>($"/api/groups/{groupId}/members");
             groupMemberCounts[groupId] = members?.Count ?? 0;
         }
         catch
