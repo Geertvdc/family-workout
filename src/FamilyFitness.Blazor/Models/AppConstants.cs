@@ -5,13 +5,6 @@ namespace FamilyFitness.Blazor.Models;
 /// </summary>
 public static class AppConstants
 {
-    /// <summary>
-    /// Default group ID for MVP - matches seeded data
-    /// </summary>
-    public static readonly Guid DefaultGroupId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
-    
-    /// <summary>
-    /// Default creator/user ID for MVP - matches seeded data
-    /// </summary>
-    public static readonly Guid DefaultCreatorId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+    // Note: DefaultGroupId and DefaultCreatorId have been removed in favor of proper user context management
+    // via IUserContextService. This ensures users can only access data within their authorized scope.
 }

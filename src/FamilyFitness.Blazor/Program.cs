@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using FamilyFitness.Blazor.Components;
+using FamilyFitness.Blazor.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
@@ -119,6 +120,9 @@ builder.Services.AddScoped(sp =>
     var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
     return httpClientFactory.CreateClient("API");
 });
+
+// Register UserContextService
+builder.Services.AddScoped<IUserContextService, UserContextService>();
 
 var app = builder.Build();
 

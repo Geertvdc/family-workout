@@ -1,7 +1,11 @@
 @page "/"
 @using Microsoft.AspNetCore.Components.Authorization
+@using FamilyFitness.Application
+@using FamilyFitness.Blazor.Services
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager Navigation
+@inject IUserContextService UserContext
+@rendermode InteractiveServer
 
 <PageTitle>FFWOD - Family Fitness Workout of the Day</PageTitle>
 
@@ -14,13 +18,65 @@
 
     <AuthorizeView>
         <Authorized>
-            <div class="card">
-                <div class="card-body text-center">
-                    <h3>Welcome back!</h3>
-                    <p>Ready to continue your fitness journey?</p>
-                    <a href="/home" class="btn btn-primary btn-lg">Go to Dashboard</a>
+            @if (loadingUserGroups)
+            {
+                <div class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Setting up your workspace...</p>
                 </div>
-            </div>
+            }
+            else if (userGroups?.Any() == true)
+            {
+                <!-- User has groups - show dashboard option -->
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h3>Welcome back!</h3>
+                        <p>Ready to continue your fitness journey?</p>
+                        <a href="/home" class="btn btn-primary btn-lg">Go to Dashboard</a>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <!-- User has no groups - show onboarding -->
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h3>Welcome to FFWOD! 🎉</h3>
+                        <p class="text-muted mb-4">Let's get you started with your first workout group.</p>
+                        
+                        <div class="get-started-steps">
+                            <div class="step">
+                                <div class="step-number">1</div>
+                                <h6>Create Your Group</h6>
+                                <p class="small">Set up a workout group for your family or friends</p>
+                            </div>
+                            
+                            <div class="step">
+                                <div class="step-number">2</div>
+                                <h6>Invite Members</h6>
+                                <p class="small">Share an invite link to add people to your group</p>
+                            </div>
+                            
+                            <div class="step">
+                                <div class="step-number">3</div>
+                                <h6>Start Working Out</h6>
+                                <p class="small">Create and run workouts together!</p>
+                            </div>
+                        </div>
+                        
+                        <div class="welcome-actions mt-4">
+                            <a href="/groups" class="btn btn-primary btn-lg me-3">
+                                🏁 Create Your First Group
+                            </a>
+                            <a href="/groups" class="btn btn-outline-secondary">
+                                🎯 Join Existing Group
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            }
         </Authorized>
         <NotAuthorized>
             <div class="info-section mt-4">
@@ -84,6 +140,35 @@
     </AuthorizeView>
 </div>
 
+@code {
+    private bool loadingUserGroups = true;
+    private List<GroupDto>? userGroups;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            if (authState.User.Identity?.IsAuthenticated == true)
+            {
+                // Load user groups to determine the appropriate experience
+                try
+                {
+                    userGroups = await UserContext.GetUserGroupsAsync();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error loading user groups: {ex.Message}");
+                    userGroups = new List<GroupDto>();
+                }
+                
+                loadingUserGroups = false;
+                StateHasChanged();
+            }
+        }
+    }
+}
+
 <style>
     .welcome-container {
         max-width: 800px;
@@ -113,5 +198,58 @@
     .btn-lg {
         padding: 0.75rem 2rem;
         font-size: 1.1rem;
+    }
+
+    .get-started-steps {
+        display: flex;
+        justify-content: center;
+        gap: 2rem;
+        margin: 2rem 0;
+        flex-wrap: wrap;
+    }
+
+    .step {
+        flex: 1;
+        min-width: 150px;
+        max-width: 200px;
+        text-align: center;
+    }
+
+    .step-number {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: var(--bs-primary);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 0.5rem;
+        font-weight: bold;
+        font-size: 1.1rem;
+    }
+
+    .step h6 {
+        color: var(--bs-primary);
+        margin-bottom: 0.5rem;
+    }
+
+    .step p.small {
+        color: var(--bs-gray-600);
+        margin-bottom: 0;
+    }
+
+    @@media (max-width: 768px) {
+        .get-started-steps {
+            flex-direction: column;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .welcome-actions .btn {
+            display: block;
+            margin: 0.5rem 0;
+            width: 100%;
+        }
     }
 </style>

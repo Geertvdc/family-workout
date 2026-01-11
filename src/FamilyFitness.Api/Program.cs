@@ -732,6 +732,47 @@ app.MapDelete("/api/invites/{id:guid}", async (Guid id, ClaimsPrincipal user, Gr
 .WithName("RevokeInvite")
 .RequireAuthorization();
 
+// Get group members endpoint
+app.MapGet("/api/groups/{groupId:guid}/members", async (Guid groupId, ClaimsPrincipal user, GroupMembershipService membershipService, UserService userService) =>
+{
+    try
+    {
+        var userId = await GetCurrentUserIdAsync(user, userService);
+        if (userId == null)
+        {
+            return Results.Unauthorized();
+        }
+        
+        // Check if user has access to this group (is owner or member)
+        var memberships = await membershipService.GetByGroupIdAsync(groupId);
+        var userMembership = memberships.FirstOrDefault(m => m.UserId == userId.Value);
+        
+        if (userMembership == null)
+        {
+            return Results.Forbid();
+        }
+        
+        // Return all members of the group
+        var allUsers = await userService.GetAllAsync();
+        var groupMembers = memberships
+            .Select(m => allUsers.FirstOrDefault(u => u.Id == m.UserId))
+            .Where(u => u != null)
+            .ToList();
+            
+        return Results.Ok(groupMembers);
+    }
+    catch (KeyNotFoundException ex)
+    {
+        return Results.NotFound(new { error = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem($"Error getting group members: {ex.Message}");
+    }
+})
+.WithName("GetGroupMembers")
+.RequireAuthorization();
+
 // GroupMembership endpoints
 app.MapGet("/api/group-memberships", async (GroupMembershipService service) =>
 {
@@ -968,6 +1009,44 @@ app.MapGet("/api/groups/{groupId:guid}/active-session", async (Guid groupId, Wor
     return Results.Ok(session);
 })
 .WithName("GetActiveWorkoutSession")
+.RequireAuthorization();
+
+// Get all workout sessions for a group (workout history)
+app.MapGet("/api/groups/{groupId:guid}/workout-sessions", async (Guid groupId, ClaimsPrincipal user, WorkoutSessionService service, UserService userService, GroupMembershipService membershipService) =>
+{
+    try
+    {
+        var userId = await GetCurrentUserIdAsync(user, userService);
+        if (userId == null)
+        {
+            return Results.Unauthorized();
+        }
+        
+        // Check if user has access to this group (is owner or member)
+        var memberships = await membershipService.GetByGroupIdAsync(groupId);
+        var userMembership = memberships.FirstOrDefault(m => m.UserId == userId.Value);
+        
+        if (userMembership == null)
+        {
+            return Results.Forbid();
+        }
+        
+        // Get all workout sessions for this group
+        var sessions = await service.GetAllAsync();
+        var groupSessions = sessions.Where(s => s.GroupId == groupId).OrderByDescending(s => s.SessionDate).ToList();
+        
+        return Results.Ok(groupSessions);
+    }
+    catch (KeyNotFoundException ex)
+    {
+        return Results.NotFound(new { error = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem($"Error getting group workout sessions: {ex.Message}");
+    }
+})
+.WithName("GetGroupWorkoutSessions")
 .RequireAuthorization();
 
 app.MapGet("/api/workout-sessions/{id:guid}/assignments", async (Guid id, WorkoutSessionService service, WorkoutTypeService workoutTypeService) =>
