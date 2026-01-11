@@ -1,0 +1,406 @@
+@page "/workout-history"
+@page "/workout-history/{GroupId:guid}"
+@using System.Net.Http.Json
+@using FamilyFitness.Blazor.Models
+@using FamilyFitness.Blazor.Services
+@inject HttpClient Http
+@inject IUserContextService UserContext
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<div class="container-fluid px-3">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="mb-0">Workout History</h3>
+        <NavLink href="/" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-house me-1"></i>
+            Back to Home
+        </NavLink>
+    </div>
+
+    @if (errorMessage != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+        </div>
+    }
+
+    <!-- Group Selector for History -->
+    @if (userGroups != null && userGroups.Count > 1)
+    {
+        <div class="card mb-4">
+            <div class="card-body">
+                <h6 class="card-title">Select Group</h6>
+                <div class="row g-2">
+                    @foreach (var group in userGroups)
+                    {
+                        <div class="col-12 col-sm-6 col-md-4">
+                            <button class="btn @(selectedGroupId == group.Id ? "btn-primary" : "btn-outline-secondary") w-100"
+                                    @onclick="() => SelectGroup(group.Id)">
+                                <div class="text-start">
+                                    <div class="fw-bold">@group.Name</div>
+                                    @if (sessionCounts.ContainsKey(group.Id))
+                                    {
+                                        <small class="text-muted d-block">@sessionCounts[group.Id] workout@(sessionCounts[group.Id] == 1 ? "" : "s")</small>
+                                    }
+                                </div>
+                            </button>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (selectedGroupId == null)
+    {
+        <div class="text-center py-5">
+            <div class="mb-3">
+                <i class="bi bi-calendar3 display-1 text-muted"></i>
+            </div>
+            <h5 class="text-muted mb-3">Select a Group</h5>
+            <p class="text-muted">Choose a group above to view its workout history.</p>
+        </div>
+    }
+    else if (isLoading)
+    {
+        <div class="d-flex justify-content-center py-5">
+            <div class="text-center">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="text-muted">Loading workout history...</p>
+            </div>
+        </div>
+    }
+    else if (workoutSessions == null || !workoutSessions.Any())
+    {
+        <div class="text-center py-5">
+            <div class="mb-3">
+                <i class="bi bi-calendar-x display-1 text-muted"></i>
+            </div>
+            <h5 class="text-muted mb-3">No Workouts Yet</h5>
+            <p class="text-muted mb-4">This group hasn't completed any workout sessions.</p>
+            <NavLink href="/setup-wod" class="btn btn-primary">
+                <i class="bi bi-plus-circle me-1"></i>
+                Create First Workout
+            </NavLink>
+        </div>
+    }
+    else
+    {
+        <!-- Workout Sessions List -->
+        <div class="row g-3">
+            @foreach (var session in workoutSessions.OrderByDescending(s => s.SessionDate))
+            {
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="row align-items-center">
+                                <div class="col">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <h6 class="mb-0">@session.SessionDate.ToString("dddd, MMMM dd, yyyy")</h6>
+                                        <span class="badge @GetStatusBadgeClass(session.Status)">
+                                            @GetStatusText(session.Status)
+                                        </span>
+                                    </div>
+                                    <small class="text-muted">
+                                        @if (session.StartedAt.HasValue)
+                                        {
+                                            <span>Started: @session.StartedAt.Value.ToString("h:mm tt")</span>
+                                            @if (session.EndedAt.HasValue)
+                                            {
+                                                <span> - Ended: @session.EndedAt.Value.ToString("h:mm tt")</span>
+                                                <span class="ms-2">(@GetDurationText(session.StartedAt.Value, session.EndedAt.Value))</span>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span>Created: @session.CreatedAt.ToString("h:mm tt")</span>
+                                        }
+                                    </small>
+                                </div>
+                                <div class="col-auto">
+                                    <button class="btn btn-sm btn-outline-secondary" 
+                                            @onclick="() => ToggleSessionDetails(session.Id)">
+                                        <i class="bi @(expandedSessions.Contains(session.Id) ? "bi-chevron-up" : "bi-chevron-down")"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        @if (expandedSessions.Contains(session.Id))
+                        {
+                            <div class="card-body">
+                                <!-- Workout Types -->
+                                @if (sessionWorkoutTypes.ContainsKey(session.Id))
+                                {
+                                    <div class="mb-3">
+                                        <h6 class="text-muted mb-2">Workout Stations</h6>
+                                        <div class="row g-2">
+                                            @foreach (var workoutType in sessionWorkoutTypes[session.Id])
+                                            {
+                                                <div class="col-6 col-md-3">
+                                                    <div class="card bg-light">
+                                                        <div class="card-body p-2">
+                                                            <div class="text-center">
+                                                                <strong class="small">Station @workoutType.StationIndex</strong>
+                                                                <div class="small">@workoutType.WorkoutTypeId</div>
+                                                                <div class="text-muted" style="font-size: 0.75rem;">Workout Type</div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+
+                                <!-- Participants -->
+                                @if (sessionParticipants.ContainsKey(session.Id))
+                                {
+                                    <div class="mb-3">
+                                        <h6 class="text-muted mb-2">Participants</h6>
+                                        <div class="d-flex flex-wrap gap-2">
+                                            @foreach (var participant in sessionParticipants[session.Id])
+                                            {
+                                                <span class="badge bg-secondary">
+                                                    User @participant.UserId.ToString()[..8]...
+                                                    <span class="ms-1">(Position @participant.ParticipantIndex)</span>
+                                                </span>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+
+                                <!-- Scores Summary -->
+                                @if (sessionScores.ContainsKey(session.Id) && sessionScores[session.Id].Any())
+                                {
+                                    <div>
+                                        <h6 class="text-muted mb-2">Performance Summary</h6>
+                                        <div class="row g-2">
+                                            @foreach (var userScores in sessionScores[session.Id].GroupBy(s => s.ParticipantId))
+                                            {
+                                                <div class="col-12 col-sm-6 col-lg-4">
+                                                    <div class="card bg-light">
+                                                        <div class="card-body p-2">
+                                                            <strong class="small">Participant @userScores.Key.ToString()[..8]...</strong>
+                                                            <div class="small">
+                                                                Total: @userScores.Sum(s => s.Score) points
+                                                                <span class="text-muted">(@userScores.Count() intervals)</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- Pagination could go here for very large histories -->
+        <div class="text-center mt-4">
+            <small class="text-muted">
+                Showing @workoutSessions.Count workout session@(workoutSessions.Count == 1 ? "" : "s")
+            </small>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid? GroupId { get; set; }
+    
+    private List<GroupDto>? userGroups;
+    private List<WorkoutSessionDto>? workoutSessions;
+    private Dictionary<Guid, List<WorkoutSessionWorkoutTypeDto>> sessionWorkoutTypes = new();
+    private Dictionary<Guid, List<WorkoutSessionParticipantDto>> sessionParticipants = new();
+    private Dictionary<Guid, List<WorkoutIntervalScoreDto>> sessionScores = new();
+    private Dictionary<Guid, int> sessionCounts = new();
+    private HashSet<Guid> expandedSessions = new();
+    private Guid? selectedGroupId;
+    private bool isLoading = false;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUserGroups();
+        
+        // If GroupId is provided in the route, select that group
+        if (GroupId.HasValue && userGroups?.Any(g => g.Id == GroupId) == true)
+        {
+            selectedGroupId = GroupId.Value;
+            await LoadWorkoutHistory();
+        }
+        // Otherwise, select user's current group from context
+        else if (userGroups?.Any() == true)
+        {
+            var currentGroupId = UserContext.GetSessionGroupId();
+            if (currentGroupId.HasValue && userGroups.Any(g => g.Id == currentGroupId.Value))
+            {
+                selectedGroupId = currentGroupId.Value;
+                await LoadWorkoutHistory();
+            }
+        }
+    }
+
+    private async Task LoadUserGroups()
+    {
+        try
+        {
+            errorMessage = null;
+            userGroups = await Http.GetFromJsonAsync<List<GroupDto>>("/api/users/me/groups");
+            
+            // Load session counts for each group
+            if (userGroups != null)
+            {
+                foreach (var group in userGroups)
+                {
+                    await LoadSessionCount(group.Id);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load groups: {ex.Message}";
+        }
+    }
+
+    private async Task LoadSessionCount(Guid groupId)
+    {
+        try
+        {
+            var sessions = await Http.GetFromJsonAsync<List<WorkoutSessionDto>>($"/api/groups/{groupId}/workout-sessions");
+            sessionCounts[groupId] = sessions?.Count ?? 0;
+        }
+        catch
+        {
+            sessionCounts[groupId] = 0;
+        }
+    }
+
+    private async Task SelectGroup(Guid groupId)
+    {
+        selectedGroupId = groupId;
+        
+        // Update URL to reflect selected group
+        Navigation.NavigateTo($"/workout-history/{groupId}");
+        
+        await LoadWorkoutHistory();
+    }
+
+    private async Task LoadWorkoutHistory()
+    {
+        if (selectedGroupId == null) return;
+
+        try
+        {
+            isLoading = true;
+            errorMessage = null;
+            
+            // Load workout sessions for the selected group
+            workoutSessions = await Http.GetFromJsonAsync<List<WorkoutSessionDto>>($"/api/groups/{selectedGroupId}/workout-sessions");
+            
+            // Load details for each session
+            if (workoutSessions != null)
+            {
+                foreach (var session in workoutSessions)
+                {
+                    await LoadSessionDetails(session.Id);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load workout history: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadSessionDetails(Guid sessionId)
+    {
+        try
+        {
+            // Load workout types for this session
+            var workoutTypes = await Http.GetFromJsonAsync<List<WorkoutSessionWorkoutTypeDto>>($"/api/workout-session-workout-types?workoutSessionId={sessionId}");
+            if (workoutTypes != null)
+            {
+                sessionWorkoutTypes[sessionId] = workoutTypes;
+            }
+
+            // Load participants for this session
+            var participants = await Http.GetFromJsonAsync<List<WorkoutSessionParticipantDto>>($"/api/workout-session-participants?workoutSessionId={sessionId}");
+            if (participants != null)
+            {
+                sessionParticipants[sessionId] = participants;
+            }
+
+            // Load scores for this session
+            var scores = await Http.GetFromJsonAsync<List<WorkoutIntervalScoreDto>>($"/api/workout-interval-scores?workoutSessionId={sessionId}");
+            if (scores != null)
+            {
+                sessionScores[sessionId] = scores;
+            }
+        }
+        catch
+        {
+            // If loading details fails, continue - we'll still show basic session info
+        }
+    }
+
+    private void ToggleSessionDetails(Guid sessionId)
+    {
+        if (expandedSessions.Contains(sessionId))
+        {
+            expandedSessions.Remove(sessionId);
+        }
+        else
+        {
+            expandedSessions.Add(sessionId);
+        }
+    }
+
+    private string GetStatusBadgeClass(WorkoutSessionStatus status)
+    {
+        return status switch
+        {
+            WorkoutSessionStatus.Pending => "bg-secondary",
+            WorkoutSessionStatus.Active => "bg-success",
+            WorkoutSessionStatus.Completed => "bg-primary",
+            WorkoutSessionStatus.Cancelled => "bg-danger",
+            _ => "bg-light text-dark"
+        };
+    }
+
+    private string GetStatusText(WorkoutSessionStatus status)
+    {
+        return status switch
+        {
+            WorkoutSessionStatus.Pending => "Setup",
+            WorkoutSessionStatus.Active => "In Progress", 
+            WorkoutSessionStatus.Completed => "Completed",
+            WorkoutSessionStatus.Cancelled => "Cancelled",
+            _ => "Unknown"
+        };
+    }
+
+    private string GetDurationText(DateTime start, DateTime end)
+    {
+        var duration = end - start;
+        if (duration.TotalHours >= 1)
+        {
+            return $"{duration.Hours}h {duration.Minutes}m";
+        }
+        else
+        {
+            return $"{duration.Minutes}m";
+        }
+    }
+}

@@ -13,4 +13,8 @@
     <PackageReference Include="Microsoft.Identity.Web" Version="2.21.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\FamilyFitness.Application\FamilyFitness.Application.csproj" />
+  </ItemGroup>
+
 </Project>
