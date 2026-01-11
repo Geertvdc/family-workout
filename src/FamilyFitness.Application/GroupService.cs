@@ -5,13 +5,15 @@ namespace FamilyFitness.Application;
 public class GroupService
 {
     private readonly IGroupRepository _repository;
+    private readonly IGroupMembershipRepository _membershipRepository;
 
-    public GroupService(IGroupRepository repository)
+    public GroupService(IGroupRepository repository, IGroupMembershipRepository membershipRepository)
     {
         _repository = repository;
+        _membershipRepository = membershipRepository;
     }
 
-    public async Task<GroupDto> CreateAsync(CreateGroupCommand command)
+    public async Task<GroupDto> CreateAsync(CreateGroupCommand command, Guid ownerId)
     {
         // Validate name
         if (string.IsNullOrWhiteSpace(command.Name))
@@ -30,27 +32,46 @@ public class GroupService
             throw new ArgumentException("Description must be 1000 characters or less.", nameof(command.Description));
         }
 
-        // Create group
+        // Create group with owner
         var group = new Group
         {
             Id = Guid.NewGuid(),
             Name = command.Name.Trim(),
             Description = command.Description?.Trim(),
+            OwnerId = ownerId,
             CreatedAt = DateTime.UtcNow
         };
 
         await _repository.AddAsync(group);
 
-        return ToDto(group);
+        // Automatically add owner as Admin member
+        var membership = new GroupMembership
+        {
+            Id = Guid.NewGuid(),
+            GroupId = group.Id,
+            UserId = ownerId,
+            Role = "Admin",
+            JoinedAt = DateTime.UtcNow
+        };
+
+        await _membershipRepository.AddAsync(membership);
+
+        return ToDto(group, ownerId);
     }
 
-    public async Task<IReadOnlyList<GroupDto>> GetAllAsync()
+    public async Task<IReadOnlyList<GroupDto>> GetAllAsync(Guid? requestingUserId = null)
     {
         var groups = await _repository.GetAllAsync();
-        return groups.Select(ToDto).ToList();
+        return groups.Select(g => ToDto(g, requestingUserId)).ToList();
     }
 
-    public async Task<GroupDto> GetByIdAsync(Guid id)
+    public async Task<IReadOnlyList<GroupDto>> GetUserGroupsAsync(Guid userId)
+    {
+        var groups = await _repository.GetByUserMembershipAsync(userId);
+        return groups.Select(g => ToDto(g, userId)).ToList();
+    }
+
+    public async Task<GroupDto> GetByIdAsync(Guid id, Guid? requestingUserId = null)
     {
         var group = await _repository.GetByIdAsync(id);
         if (group == null)
@@ -58,16 +79,22 @@ public class GroupService
             throw new KeyNotFoundException($"Group with ID '{id}' not found.");
         }
 
-        return ToDto(group);
+        return ToDto(group, requestingUserId);
     }
 
-    public async Task<GroupDto> UpdateAsync(UpdateGroupCommand command)
+    public async Task<GroupDto> UpdateAsync(UpdateGroupCommand command, Guid requestingUserId)
     {
         // Check if exists
         var existing = await _repository.GetByIdAsync(command.Id);
         if (existing == null)
         {
             throw new KeyNotFoundException($"Group with ID '{command.Id}' not found.");
+        }
+
+        // Check if user is the owner
+        if (existing.OwnerId != requestingUserId)
+        {
+            throw new UnauthorizedAccessException("Only the group owner can update the group.");
         }
 
         // Validate name
@@ -93,10 +120,10 @@ public class GroupService
 
         await _repository.UpdateAsync(existing);
 
-        return ToDto(existing);
+        return ToDto(existing, requestingUserId);
     }
 
-    public async Task DeleteAsync(Guid id)
+    public async Task DeleteAsync(Guid id, Guid requestingUserId)
     {
         var existing = await _repository.GetByIdAsync(id);
         if (existing == null)
@@ -104,15 +131,35 @@ public class GroupService
             throw new KeyNotFoundException($"Group with ID '{id}' not found.");
         }
 
+        // Check if user is the owner
+        if (existing.OwnerId != requestingUserId)
+        {
+            throw new UnauthorizedAccessException("Only the group owner can delete the group.");
+        }
+
         await _repository.DeleteAsync(id);
     }
 
-    private static GroupDto ToDto(Group group)
+    public async Task<bool> IsUserGroupOwnerAsync(Guid groupId, Guid userId)
+    {
+        var group = await _repository.GetByIdAsync(groupId);
+        return group != null && group.OwnerId == userId;
+    }
+
+    public async Task<bool> IsUserGroupMemberAsync(Guid groupId, Guid userId)
+    {
+        var membership = await _membershipRepository.GetByGroupAndUserAsync(groupId, userId);
+        return membership != null;
+    }
+
+    private static GroupDto ToDto(Group group, Guid? requestingUserId = null)
     {
         return new GroupDto(
             group.Id,
             group.Name,
             group.Description,
+            group.OwnerId,
+            requestingUserId.HasValue && group.OwnerId == requestingUserId.Value,
             group.CreatedAt
         );
     }

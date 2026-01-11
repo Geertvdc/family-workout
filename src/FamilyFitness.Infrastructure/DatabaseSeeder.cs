@@ -17,7 +17,7 @@ public static class DatabaseSeeder
         {
             Id = Guid.Parse("11111111-1111-1111-1111-111111111111"),
             Username = "geert",
-            Email = "geert@vdcruijsen.net",
+            Email = "geert@test.net",
             CreatedAt = DateTime.UtcNow
         };
 
@@ -25,7 +25,7 @@ public static class DatabaseSeeder
         {
             Id = Guid.Parse("22222222-2222-2222-2222-222222222222"),
             Username = "patty",
-            Email = "patty@vdcruijsen.net",
+            Email = "patty@test.net",
             CreatedAt = DateTime.UtcNow
         };
 
@@ -33,7 +33,7 @@ public static class DatabaseSeeder
         {
             Id = Guid.Parse("33333333-3333-3333-3333-333333333333"),
             Username = "lauren",
-            Email = "lauren@vdcruijsen.net",
+            Email = "lauren@test.net",
             CreatedAt = DateTime.UtcNow
         };
 
@@ -41,18 +41,19 @@ public static class DatabaseSeeder
         {
             Id = Guid.Parse("44444444-4444-4444-4444-444444444444"),
             Username = "amber",
-            Email = "amber@vdcruijsen.net",
+            Email = "amber@test.net",
             CreatedAt = DateTime.UtcNow
         };
 
         await context.Users.AddRangeAsync(geert, patty, lauren, amber);
 
-        // Create group with a distinct test GUID
+        // Create group with a distinct test GUID - Geert is the owner
         var cruijsjes = new Group
         {
             Id = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
             Name = "cruijsjes",
             Description = "The Cruijsen family",
+            OwnerId = geert.Id,
             CreatedAt = DateTime.UtcNow
         };
 

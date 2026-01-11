@@ -14,6 +14,7 @@ public class FamilyFitnessDbContext : DbContext
     public DbSet<User> Users => Set<User>();
     public DbSet<Group> Groups => Set<Group>();
     public DbSet<GroupMembership> GroupMemberships => Set<GroupMembership>();
+    public DbSet<GroupInvite> GroupInvites => Set<GroupInvite>();
     public DbSet<WorkoutSession> WorkoutSessions => Set<WorkoutSession>();
     public DbSet<WorkoutSessionWorkoutType> WorkoutSessionWorkoutTypes => Set<WorkoutSessionWorkoutType>();
     public DbSet<WorkoutSessionParticipant> WorkoutSessionParticipants => Set<WorkoutSessionParticipant>();
@@ -25,6 +26,7 @@ public class FamilyFitnessDbContext : DbContext
         ConfigureUser(modelBuilder);
         ConfigureGroup(modelBuilder);
         ConfigureGroupMembership(modelBuilder);
+        ConfigureGroupInvite(modelBuilder);
         ConfigureWorkoutSession(modelBuilder);
         ConfigureWorkoutSessionWorkoutType(modelBuilder);
         ConfigureWorkoutSessionParticipant(modelBuilder);
@@ -61,6 +63,9 @@ public class FamilyFitnessDbContext : DbContext
             entity.ToTable("users");
             entity.HasKey(e => e.Id);
             
+            entity.Property(e => e.EntraObjectId)
+                .HasMaxLength(100);
+            
             entity.Property(e => e.Username)
                 .HasMaxLength(100)
                 .IsRequired();
@@ -71,6 +76,11 @@ public class FamilyFitnessDbContext : DbContext
             
             entity.Property(e => e.CreatedAt)
                 .IsRequired();
+
+            // Index on EntraObjectId for fast lookup (unique if not null)
+            entity.HasIndex(e => e.EntraObjectId)
+                .IsUnique()
+                .HasFilter("\"EntraObjectId\" IS NOT NULL");
 
             entity.HasIndex(e => e.Username)
                 .IsUnique();
@@ -94,8 +104,46 @@ public class FamilyFitnessDbContext : DbContext
             entity.Property(e => e.Description)
                 .HasMaxLength(1000);
             
+            entity.Property(e => e.OwnerId)
+                .IsRequired();
+            
             entity.Property(e => e.CreatedAt)
                 .IsRequired();
+
+            // Relationships
+            entity.HasOne(e => e.Owner)
+                .WithMany()
+                .HasForeignKey(e => e.OwnerId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private void ConfigureGroupInvite(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<GroupInvite>(entity =>
+        {
+            entity.ToTable("group_invites");
+            entity.HasKey(e => e.Id);
+            
+            entity.Property(e => e.Token)
+                .HasMaxLength(100)
+                .IsRequired();
+            
+            entity.Property(e => e.CreatedAt)
+                .IsRequired();
+            
+            entity.Property(e => e.IsActive)
+                .IsRequired();
+
+            // Unique constraint on token
+            entity.HasIndex(e => e.Token)
+                .IsUnique();
+
+            // Relationships
+            entity.HasOne(e => e.Group)
+                .WithMany(g => g.GroupInvites)
+                .HasForeignKey(e => e.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 

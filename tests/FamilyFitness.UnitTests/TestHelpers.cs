@@ -123,6 +123,7 @@ public class InMemoryWorkoutSessionRepository : IWorkoutSessionRepository
 public class InMemoryGroupRepository : IGroupRepository
 {
     private readonly List<Group> _groups = new();
+    private readonly List<GroupMembership> _memberships = new();
 
     public Task<Group?> GetByIdAsync(Guid id)
     {
@@ -133,6 +134,19 @@ public class InMemoryGroupRepository : IGroupRepository
     public Task<IReadOnlyList<Group>> GetAllAsync()
     {
         return Task.FromResult<IReadOnlyList<Group>>(_groups.ToList());
+    }
+
+    public Task<IReadOnlyList<Group>> GetByUserMembershipAsync(Guid userId)
+    {
+        var groupIds = _memberships.Where(m => m.UserId == userId).Select(m => m.GroupId).ToHashSet();
+        var groups = _groups.Where(g => groupIds.Contains(g.Id)).ToList();
+        return Task.FromResult<IReadOnlyList<Group>>(groups);
+    }
+
+    public Task<IReadOnlyList<Group>> GetByOwnerIdAsync(Guid ownerId)
+    {
+        var groups = _groups.Where(g => g.OwnerId == ownerId).ToList();
+        return Task.FromResult<IReadOnlyList<Group>>(groups);
     }
 
     public Task AddAsync(Group group)
@@ -160,6 +174,12 @@ public class InMemoryGroupRepository : IGroupRepository
         }
         return Task.CompletedTask;
     }
+
+    // Helper method for tests to add memberships
+    public void AddMembership(GroupMembership membership)
+    {
+        _memberships.Add(membership);
+    }
 }
 
 public class InMemoryUserRepository : IUserRepository
@@ -186,6 +206,12 @@ public class InMemoryUserRepository : IUserRepository
     public Task<User?> GetByEmailAsync(string email)
     {
         var user = _users.FirstOrDefault(u => u.Email.Equals(email, StringComparison.OrdinalIgnoreCase));
+        return Task.FromResult(user);
+    }
+
+    public Task<User?> GetByEntraObjectIdAsync(string entraObjectId)
+    {
+        var user = _users.FirstOrDefault(u => u.EntraObjectId != null && u.EntraObjectId.Equals(entraObjectId, StringComparison.OrdinalIgnoreCase));
         return Task.FromResult(user);
     }
 

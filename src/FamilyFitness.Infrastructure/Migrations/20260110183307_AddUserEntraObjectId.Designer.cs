@@ -3,6 +3,7 @@ using System;
 using FamilyFitness.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FamilyFitness.Infrastructure.Migrations
 {
     [DbContext(typeof(FamilyFitnessDbContext))]
-    partial class FamilyFitnessDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260110183307_AddUserEntraObjectId")]
+    partial class AddUserEntraObjectId
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
