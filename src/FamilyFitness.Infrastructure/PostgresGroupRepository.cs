@@ -23,6 +23,20 @@ public class PostgresGroupRepository : IGroupRepository
         return await _context.Groups.ToListAsync();
     }
 
+    public async Task<IReadOnlyList<Group>> GetByUserMembershipAsync(Guid userId)
+    {
+        return await _context.Groups
+            .Where(g => g.GroupMemberships.Any(m => m.UserId == userId))
+            .ToListAsync();
+    }
+
+    public async Task<IReadOnlyList<Group>> GetByOwnerIdAsync(Guid ownerId)
+    {
+        return await _context.Groups
+            .Where(g => g.OwnerId == ownerId)
+            .ToListAsync();
+    }
+
     public async Task AddAsync(Group group)
     {
         await _context.Groups.AddAsync(group);

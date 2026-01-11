@@ -3,6 +3,7 @@ using System;
 using FamilyFitness.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FamilyFitness.Infrastructure.Migrations
 {
     [DbContext(typeof(FamilyFitnessDbContext))]
-    partial class FamilyFitnessDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260110170613_AddGroupOwnershipAndInvites")]
+    partial class AddGroupOwnershipAndInvites
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -123,10 +126,6 @@ namespace FamilyFitness.Infrastructure.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
 
-                    b.Property<string>("EntraObjectId")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
                     b.Property<string>("Username")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -136,10 +135,6 @@ namespace FamilyFitness.Infrastructure.Migrations
 
                     b.HasIndex("Email")
                         .IsUnique();
-
-                    b.HasIndex("EntraObjectId")
-                        .IsUnique()
-                        .HasFilter("\"EntraObjectId\" IS NOT NULL");
 
                     b.HasIndex("Username")
                         .IsUnique();

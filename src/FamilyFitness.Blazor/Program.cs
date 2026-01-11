@@ -49,7 +49,8 @@ builder.Services.Configure<OpenIdConnectOptions>(OpenIdConnectDefaults.Authentic
     {
         // Log successful authentication with better detail
         var name = context.Principal?.Identity?.Name ?? "Unknown";
-        var email = context.Principal?.FindFirst("emails")?.Value ?? 
+        var email = context.Principal?.FindFirst("emailaddress")?.Value ??
+                   context.Principal?.FindFirst("emails")?.Value ?? 
                    context.Principal?.FindFirst("email")?.Value ?? 
                    context.Principal?.FindFirst("preferred_username")?.Value ?? "No email";
         Console.WriteLine($"[AUTH] User authenticated: {name} | Email: {email}");
@@ -226,12 +227,18 @@ app.Use(async (context, next) =>
                     {
                         Console.WriteLine($"[PROVISION FAILED] 401 Unauthorized - Token issue detected");
                         
-                        // Check if we've been trying consent for a while - if so, force re-auth
-                        if (userProvisioned?.StartsWith("needs_consent_") == true &&
-                            DateTime.TryParseExact(userProvisioned.Substring(14), "yyyyMMddHHmm", null, DateTimeStyles.None, out var oldConsentTime) &&
-                            DateTime.UtcNow.Subtract(oldConsentTime).TotalMinutes > 10)
+                        // Count how many times we've tried
+                        var attemptCount = 0;
+                        if (userProvisioned?.StartsWith("needs_reauth_") == true)
                         {
-                            Console.WriteLine($"[PROVISION] Consent attempts have failed for 10+ minutes. Forcing fresh authentication.");
+                            int.TryParse(userProvisioned.Substring(13), out attemptCount);
+                        }
+                        attemptCount++;
+                        
+                        if (attemptCount > 3)
+                        {
+                            // After 3 attempts, force complete re-authentication
+                            Console.WriteLine($"[PROVISION] Multiple auth failures. Forcing fresh authentication.");
                             context.Session.Clear();
                             await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
                             await context.ChallengeAsync(OpenIdConnectDefaults.AuthenticationScheme, new AuthenticationProperties
@@ -242,14 +249,16 @@ app.Use(async (context, next) =>
                         }
                         else
                         {
-                            context.Session.SetString("user_provisioned", $"needs_consent_{DateTime.UtcNow:yyyyMMddHHmm}");
-                            // For 401 errors, redirect to consent to get proper token
-                            if (currentPath != "/consent" && !currentPath.StartsWith("/_"))
+                            // Mark as needing re-auth and trigger silent re-authentication
+                            context.Session.SetString("user_provisioned", $"needs_reauth_{attemptCount}");
+                            Console.WriteLine($"[PROVISION] Triggering re-authentication (attempt {attemptCount})");
+                            
+                            // Challenge will trigger token refresh automatically
+                            await context.ChallengeAsync(OpenIdConnectDefaults.AuthenticationScheme, new AuthenticationProperties
                             {
-                                Console.WriteLine($"[PROVISION] Redirecting to consent for token acquisition");
-                                context.Response.Redirect("/consent");
-                                return;
-                            }
+                                RedirectUri = context.Request.Path
+                            });
+                            return;
                         }
                     }
                     else
@@ -294,14 +303,9 @@ app.UseAntiforgery();
 // Authentication endpoints
 app.MapGet("/consent", async context =>
 {
-    Console.WriteLine("[AUTH] Consent endpoint called");
-    var properties = new AuthenticationProperties
-    {
-        RedirectUri = "/setup-wod"
-    };
-    properties.Items["prompt"] = "consent";
-    
-    await context.ChallengeAsync(OpenIdConnectDefaults.AuthenticationScheme, properties);
+    // Legacy endpoint - now just does a regular re-authentication
+    Console.WriteLine("[AUTH] Consent endpoint called - redirecting to signin");
+    context.Response.Redirect("/signin");
 });
 
 app.MapGet("/signup", async context =>

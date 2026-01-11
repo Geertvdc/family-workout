@@ -40,6 +40,7 @@ builder.Services.AddScoped<IWorkoutTypeRepository, PostgresWorkoutTypeRepository
 builder.Services.AddScoped<IUserRepository, PostgresUserRepository>();
 builder.Services.AddScoped<IGroupRepository, PostgresGroupRepository>();
 builder.Services.AddScoped<IGroupMembershipRepository, PostgresGroupMembershipRepository>();
+builder.Services.AddScoped<IGroupInviteRepository, PostgresGroupInviteRepository>();
 builder.Services.AddScoped<IWorkoutSessionRepository, PostgresWorkoutSessionRepository>();
 builder.Services.AddScoped<IWorkoutSessionWorkoutTypeRepository, PostgresWorkoutSessionWorkoutTypeRepository>();
 builder.Services.AddScoped<IWorkoutSessionParticipantRepository, PostgresWorkoutSessionParticipantRepository>();
@@ -51,6 +52,7 @@ builder.Services.AddScoped<WorkoutTypeService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<GroupService>();
 builder.Services.AddScoped<GroupMembershipService>();
+builder.Services.AddScoped<GroupInviteService>();
 builder.Services.AddScoped<WorkoutSessionService>();
 builder.Services.AddScoped<WorkoutSessionWorkoutTypeService>();
 builder.Services.AddScoped<WorkoutSessionParticipantService>();
@@ -129,12 +131,36 @@ app.MapGet("/api/me", async (ClaimsPrincipal user, UserService userService, ILog
     logger.LogInformation("[API/ME] Processing request for user provisioning");
     logger.LogInformation("[API/ME] Claims: {Claims}", string.Join(" | ", user.Claims.Select(c => $"{c.Type}={c.Value}")));
     
-    // Azure Entra External ID sends email as "emails" (plural) claim
-    // Also check "email", "preferred_username", and standard ClaimTypes.Email
-    var emailClaim = user.FindFirst("emails")?.Value 
+    // Get Entra Object ID (oid) - this is the stable identifier for the user
+    var entraObjectId = user.FindFirst("oid")?.Value 
+        ?? user.FindFirst("objectidentifier")?.Value
+        ?? user.FindFirst("http://schemas.microsoft.com/identity/claims/objectidentifier")?.Value;
+    logger.LogInformation("[API/ME] Entra Object ID: {OID}", entraObjectId ?? "NOT FOUND");
+    
+    // Check identity provider - may be google.com, facebook.com, etc.
+    var idp = user.FindFirst("idp")?.Value 
+        ?? user.FindFirst("identityprovider")?.Value
+        ?? user.FindFirst("http://schemas.microsoft.com/identity/claims/identityprovider")?.Value;
+    logger.LogInformation("[API/ME] Identity Provider: {IDP}", idp ?? "Local/Entra");
+    
+    // Get the real email address (not the .onmicrosoft.com shadow account)
+    // Priority: emailaddress > emails > email > ClaimTypes.Email
+    var emailClaim = user.FindFirst("emailaddress")?.Value
+        ?? user.FindFirst("emails")?.Value 
         ?? user.FindFirst("email")?.Value 
-        ?? user.FindFirst("preferred_username")?.Value
-        ?? user.FindFirst(ClaimTypes.Email)?.Value;
+        ?? user.FindFirst(ClaimTypes.Email)?.Value
+        ?? user.FindFirst("signInNames.emailAddress")?.Value
+        ?? user.FindFirst("otherMails")?.Value;
+    
+    // If email is still null or looks like @onmicrosoft.com, try preferred_username as last resort
+    if (string.IsNullOrWhiteSpace(emailClaim) || emailClaim.Contains(".onmicrosoft.com"))
+    {
+        var preferredUsername = user.FindFirst("preferred_username")?.Value;
+        if (!string.IsNullOrWhiteSpace(preferredUsername) && !preferredUsername.Contains(".onmicrosoft.com"))
+        {
+            emailClaim = preferredUsername;
+        }
+    }
     
     logger.LogInformation("[API/ME] Extracted email claim: {Email}", emailClaim ?? "NOT FOUND");
     
@@ -144,19 +170,31 @@ app.MapGet("/api/me", async (ClaimsPrincipal user, UserService userService, ILog
         return Results.BadRequest(new { error = "Email claim not found. Available claims: " + string.Join(", ", user.Claims.Select(c => c.Type)) });
     }
 
-    // Try to find existing user by email
+    // Try to find existing user - first by EntraObjectId (most reliable), then by email
     try
     {
-        var existingUsers = await userService.GetAllAsync();
-        var existingUser = existingUsers.FirstOrDefault(u => u.Email.Equals(emailClaim, StringComparison.OrdinalIgnoreCase));
-        
-        if (existingUser != null)
+        // Priority 1: Look up by EntraObjectId (stable identifier)
+        if (!string.IsNullOrWhiteSpace(entraObjectId))
         {
-            logger.LogInformation("[API/ME] Found existing user: {UserId} - {Email}", existingUser.Id, existingUser.Email);
-            return Results.Ok(existingUser);
+            var existingByEntraId = await userService.GetByEntraObjectIdAsync(entraObjectId);
+            if (existingByEntraId != null)
+            {
+                logger.LogInformation("[API/ME] Found existing user by EntraObjectId: {UserId} - {Email}", existingByEntraId.Id, existingByEntraId.Email);
+                return Results.Ok(existingByEntraId);
+            }
         }
         
-        logger.LogInformation("[API/ME] No existing user found for email: {Email}", emailClaim);
+        // Priority 2: Look up by email (for backwards compatibility / users created before EntraObjectId was added)
+        var existingUsers = await userService.GetAllAsync();
+        var existingByEmail = existingUsers.FirstOrDefault(u => u.Email.Equals(emailClaim, StringComparison.OrdinalIgnoreCase));
+        
+        if (existingByEmail != null)
+        {
+            logger.LogInformation("[API/ME] Found existing user by email: {UserId} - {Email}", existingByEmail.Id, existingByEmail.Email);
+            return Results.Ok(existingByEmail);
+        }
+        
+        logger.LogInformation("[API/ME] No existing user found for EntraObjectId: {OID} or email: {Email}", entraObjectId, emailClaim);
     }
     catch (Exception ex)
     {
@@ -166,13 +204,62 @@ app.MapGet("/api/me", async (ClaimsPrincipal user, UserService userService, ILog
     // Create new user
     try
     {
-        var nameClaim = user.FindFirst("name")?.Value 
-            ?? user.FindFirst(ClaimTypes.Name)?.Value 
-            ?? user.FindFirst("given_name")?.Value
-            ?? "Unknown";
-        var username = nameClaim.Replace(" ", "").ToLowerInvariant(); // Simple username generation
+        // Get display name from various claims
+        var givenName = user.FindFirst("givenname")?.Value 
+            ?? user.FindFirst("given_name")?.Value 
+            ?? user.FindFirst(ClaimTypes.GivenName)?.Value;
+        var familyName = user.FindFirst("surname")?.Value 
+            ?? user.FindFirst("family_name")?.Value 
+            ?? user.FindFirst(ClaimTypes.Surname)?.Value;
         
-        logger.LogInformation("[API/ME] Creating new user - Name: {Name}, Username: {Username}, Email: {Email}", nameClaim, username, emailClaim);
+        // Construct full name from given + family name
+        string? nameClaim = null;
+        if (!string.IsNullOrWhiteSpace(givenName))
+        {
+            nameClaim = string.IsNullOrWhiteSpace(familyName) 
+                ? givenName 
+                : $"{givenName} {familyName}";
+        }
+        
+        // If still no name, try the "name" claim (but skip if it's "unknown" or looks like email)
+        if (string.IsNullOrWhiteSpace(nameClaim))
+        {
+            var rawName = user.FindFirst("name")?.Value ?? user.FindFirst(ClaimTypes.Name)?.Value;
+            if (!string.IsNullOrWhiteSpace(rawName) && 
+                !rawName.Equals("unknown", StringComparison.OrdinalIgnoreCase) &&
+                !rawName.Contains("@") && 
+                !rawName.Contains(".onmicrosoft.com"))
+            {
+                nameClaim = rawName;
+            }
+        }
+        
+        // Fallback: use the local part of email as name
+        if (string.IsNullOrWhiteSpace(nameClaim) || nameClaim.Equals("unknown", StringComparison.OrdinalIgnoreCase))
+        {
+            nameClaim = emailClaim.Split('@')[0];
+            if (nameClaim.Length > 0)
+            {
+                nameClaim = char.ToUpper(nameClaim[0]) + nameClaim.Substring(1);
+            }
+        }
+        
+        if (string.IsNullOrWhiteSpace(nameClaim))
+        {
+            nameClaim = "Unknown";
+        }
+        
+        // Generate username from name (remove spaces, lowercase, alphanumeric only)
+        var username = nameClaim.Replace(" ", "").ToLowerInvariant();
+        username = new string(username.Where(c => char.IsLetterOrDigit(c)).ToArray());
+        
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            username = "user";
+        }
+        
+        logger.LogInformation("[API/ME] Creating new user - EntraObjectId: {OID}, Name: {Name}, Username: {Username}, Email: {Email}", 
+            entraObjectId, nameClaim, username, emailClaim);
         
         // Handle potential username conflicts by adding numbers
         var baseUsername = username;
@@ -185,7 +272,7 @@ app.MapGet("/api/me", async (ClaimsPrincipal user, UserService userService, ILog
             counter++;
         }
 
-        var createCommand = new CreateUserCommand(username, emailClaim);
+        var createCommand = new CreateUserCommand(entraObjectId, username, emailClaim);
         var newUser = await userService.CreateAsync(createCommand);
         
         logger.LogInformation("[API/ME] Successfully created new user: {UserId} - {Username} - {Email}", newUser.Id, newUser.Username, newUser.Email);
@@ -383,19 +470,80 @@ app.MapDelete("/api/users/{id:guid}", async (Guid id, UserService service) =>
 .RequireAuthorization();
 
 // Group endpoints
-app.MapGet("/api/groups", async (GroupService service) =>
+
+// Helper function to get current user ID from claims
+async Task<Guid?> GetCurrentUserIdAsync(ClaimsPrincipal user, UserService userService)
 {
-    var groups = await service.GetAllAsync();
+    // Priority 1: Look up by EntraObjectId (most reliable)
+    var entraObjectId = user.FindFirst("oid")?.Value 
+        ?? user.FindFirst("objectidentifier")?.Value
+        ?? user.FindFirst("http://schemas.microsoft.com/identity/claims/objectidentifier")?.Value;
+    
+    if (!string.IsNullOrWhiteSpace(entraObjectId))
+    {
+        var userByEntraId = await userService.GetByEntraObjectIdAsync(entraObjectId);
+        if (userByEntraId != null)
+        {
+            return userByEntraId.Id;
+        }
+    }
+    
+    // Priority 2: Look up by email (for backwards compatibility)
+    var emailClaim = user.FindFirst("emailaddress")?.Value
+        ?? user.FindFirst("emails")?.Value 
+        ?? user.FindFirst("email")?.Value 
+        ?? user.FindFirst(ClaimTypes.Email)?.Value
+        ?? user.FindFirst("signInNames.emailAddress")?.Value;
+    
+    // Only use preferred_username if it doesn't look like an @onmicrosoft.com shadow account
+    if (string.IsNullOrWhiteSpace(emailClaim))
+    {
+        var preferredUsername = user.FindFirst("preferred_username")?.Value;
+        if (!string.IsNullOrWhiteSpace(preferredUsername) && !preferredUsername.Contains(".onmicrosoft.com"))
+        {
+            emailClaim = preferredUsername;
+        }
+    }
+    
+    if (string.IsNullOrWhiteSpace(emailClaim))
+        return null;
+    
+    var users = await userService.GetAllAsync();
+    var currentUser = users.FirstOrDefault(u => u.Email.Equals(emailClaim, StringComparison.OrdinalIgnoreCase));
+    return currentUser?.Id;
+}
+
+// Get current user's groups only (scoped)
+app.MapGet("/api/users/me/groups", async (ClaimsPrincipal user, GroupService groupService, UserService userService) =>
+{
+    var userId = await GetCurrentUserIdAsync(user, userService);
+    if (userId == null)
+    {
+        return Results.Unauthorized();
+    }
+    
+    var groups = await groupService.GetUserGroupsAsync(userId.Value);
+    return Results.Ok(groups);
+})
+.WithName("GetCurrentUserGroups")
+.RequireAuthorization();
+
+// Keep GetAllGroups for admin purposes but mark it differently
+app.MapGet("/api/groups", async (ClaimsPrincipal user, GroupService service, UserService userService) =>
+{
+    var userId = await GetCurrentUserIdAsync(user, userService);
+    var groups = await service.GetAllAsync(userId);
     return Results.Ok(groups);
 })
 .WithName("GetAllGroups")
 .RequireAuthorization();
 
-app.MapGet("/api/groups/{id:guid}", async (Guid id, GroupService service) =>
+app.MapGet("/api/groups/{id:guid}", async (Guid id, ClaimsPrincipal user, GroupService service, UserService userService) =>
 {
     try
     {
-        var group = await service.GetByIdAsync(id);
+        var userId = await GetCurrentUserIdAsync(user, userService);
+        var group = await service.GetByIdAsync(id, userId);
         return Results.Ok(group);
     }
     catch (KeyNotFoundException ex)
@@ -406,11 +554,17 @@ app.MapGet("/api/groups/{id:guid}", async (Guid id, GroupService service) =>
 .WithName("GetGroupById")
 .RequireAuthorization();
 
-app.MapPost("/api/groups", async (CreateGroupCommand command, GroupService service) =>
+app.MapPost("/api/groups", async (CreateGroupCommand command, ClaimsPrincipal user, GroupService service, UserService userService) =>
 {
     try
     {
-        var group = await service.CreateAsync(command);
+        var userId = await GetCurrentUserIdAsync(user, userService);
+        if (userId == null)
+        {
+            return Results.Unauthorized();
+        }
+        
+        var group = await service.CreateAsync(command, userId.Value);
         return Results.Created($"/api/groups/{group.Id}", group);
     }
     catch (ArgumentException ex)
@@ -421,7 +575,7 @@ app.MapPost("/api/groups", async (CreateGroupCommand command, GroupService servi
 .WithName("CreateGroup")
 .RequireAuthorization();
 
-app.MapPut("/api/groups/{id:guid}", async (Guid id, UpdateGroupCommand command, GroupService service) =>
+app.MapPut("/api/groups/{id:guid}", async (Guid id, UpdateGroupCommand command, ClaimsPrincipal user, GroupService service, UserService userService) =>
 {
     if (id != command.Id)
     {
@@ -430,12 +584,22 @@ app.MapPut("/api/groups/{id:guid}", async (Guid id, UpdateGroupCommand command, 
 
     try
     {
-        var group = await service.UpdateAsync(command);
+        var userId = await GetCurrentUserIdAsync(user, userService);
+        if (userId == null)
+        {
+            return Results.Unauthorized();
+        }
+        
+        var group = await service.UpdateAsync(command, userId.Value);
         return Results.Ok(group);
     }
     catch (KeyNotFoundException ex)
     {
         return Results.NotFound(new { error = ex.Message });
+    }
+    catch (UnauthorizedAccessException ex)
+    {
+        return Results.Forbid();
     }
     catch (ArgumentException ex)
     {
@@ -445,19 +609,137 @@ app.MapPut("/api/groups/{id:guid}", async (Guid id, UpdateGroupCommand command, 
 .WithName("UpdateGroup")
 .RequireAuthorization();
 
-app.MapDelete("/api/groups/{id:guid}", async (Guid id, GroupService service) =>
+app.MapDelete("/api/groups/{id:guid}", async (Guid id, ClaimsPrincipal user, GroupService service, UserService userService) =>
 {
     try
     {
-        await service.DeleteAsync(id);
+        var userId = await GetCurrentUserIdAsync(user, userService);
+        if (userId == null)
+        {
+            return Results.Unauthorized();
+        }
+        
+        await service.DeleteAsync(id, userId.Value);
         return Results.NoContent();
     }
     catch (KeyNotFoundException ex)
     {
         return Results.NotFound(new { error = ex.Message });
     }
+    catch (UnauthorizedAccessException ex)
+    {
+        return Results.Forbid();
+    }
 })
 .WithName("DeleteGroup")
+.RequireAuthorization();
+
+// Group Invite endpoints
+app.MapPost("/api/groups/{groupId:guid}/invites", async (Guid groupId, ClaimsPrincipal user, GroupInviteService inviteService, UserService userService) =>
+{
+    try
+    {
+        var userId = await GetCurrentUserIdAsync(user, userService);
+        if (userId == null)
+        {
+            return Results.Unauthorized();
+        }
+        
+        var command = new CreateInviteCommand(groupId);
+        var invite = await inviteService.CreateInviteAsync(command, userId.Value);
+        return Results.Created($"/api/invites/{invite.Token}", invite);
+    }
+    catch (KeyNotFoundException ex)
+    {
+        return Results.NotFound(new { error = ex.Message });
+    }
+    catch (UnauthorizedAccessException ex)
+    {
+        return Results.Forbid();
+    }
+})
+.WithName("CreateGroupInvite")
+.RequireAuthorization();
+
+app.MapGet("/api/groups/{groupId:guid}/invites", async (Guid groupId, ClaimsPrincipal user, GroupInviteService inviteService, UserService userService) =>
+{
+    try
+    {
+        var userId = await GetCurrentUserIdAsync(user, userService);
+        if (userId == null)
+        {
+            return Results.Unauthorized();
+        }
+        
+        var invites = await inviteService.GetGroupInvitesAsync(groupId, userId.Value);
+        return Results.Ok(invites);
+    }
+    catch (KeyNotFoundException ex)
+    {
+        return Results.NotFound(new { error = ex.Message });
+    }
+    catch (UnauthorizedAccessException ex)
+    {
+        return Results.Forbid();
+    }
+})
+.WithName("GetGroupInvites")
+.RequireAuthorization();
+
+app.MapGet("/api/invites/{token}", async (string token, GroupInviteService inviteService) =>
+{
+    var invite = await inviteService.GetInviteByTokenAsync(token);
+    if (invite == null)
+    {
+        return Results.NotFound(new { error = "Invalid or inactive invite link." });
+    }
+    return Results.Ok(invite);
+})
+.WithName("GetInviteByToken")
+.RequireAuthorization();
+
+app.MapPost("/api/invites/{token}/accept", async (string token, ClaimsPrincipal user, GroupInviteService inviteService, UserService userService) =>
+{
+    var userId = await GetCurrentUserIdAsync(user, userService);
+    if (userId == null)
+    {
+        return Results.Unauthorized();
+    }
+    
+    var result = await inviteService.AcceptInviteAsync(token, userId.Value);
+    if (!result.Success)
+    {
+        return Results.BadRequest(new { error = result.ErrorMessage });
+    }
+    
+    return Results.Ok(result);
+})
+.WithName("AcceptInvite")
+.RequireAuthorization();
+
+app.MapDelete("/api/invites/{id:guid}", async (Guid id, ClaimsPrincipal user, GroupInviteService inviteService, UserService userService) =>
+{
+    try
+    {
+        var userId = await GetCurrentUserIdAsync(user, userService);
+        if (userId == null)
+        {
+            return Results.Unauthorized();
+        }
+        
+        await inviteService.RevokeInviteAsync(id, userId.Value);
+        return Results.NoContent();
+    }
+    catch (KeyNotFoundException ex)
+    {
+        return Results.NotFound(new { error = ex.Message });
+    }
+    catch (UnauthorizedAccessException ex)
+    {
+        return Results.Forbid();
+    }
+})
+.WithName("RevokeInvite")
 .RequireAuthorization();
 
 // GroupMembership endpoints

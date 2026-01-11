@@ -4,6 +4,8 @@ public record GroupDto(
     Guid Id,
     string Name,
     string? Description,
+    Guid OwnerId,
+    bool IsOwner,
     DateTime CreatedAt
 );
 

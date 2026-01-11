@@ -1,9 +1,10 @@
 @page "/groups"
 @using System.Net.Http.Json
 @inject HttpClient Http
+@inject NavigationManager Navigation
 @rendermode InteractiveServer
 
-<h3>Groups</h3>
+<h3>My Groups</h3>
 
 @if (errorMessage != null)
 {
@@ -34,14 +35,14 @@
                 }
                 else
                 {
-                    <span>Create</span>
+                    <span>Create Group</span>
                 }
             </button>
         </EditForm>
     </div>
 </div>
 
-<h4>All Groups</h4>
+<h4>Your Groups</h4>
 
 @if (groups == null)
 {
@@ -49,43 +50,92 @@
 }
 else if (!groups.Any())
 {
-    <p><em>No groups found. Create one above to get started!</em></p>
+    <p><em>You're not a member of any groups yet. Create one above or use an invite link to join!</em></p>
 }
 else
 {
-    <table class="table table-striped">
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>Description</th>
-                <th>Created At</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var group in groups)
-            {
-                <tr>
-                    <td>@group.Name</td>
-                    <td>@(group.Description ?? "-")</td>
-                    <td>@group.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
-                    <td>
-                        <button class="btn btn-sm btn-danger" @onclick="() => DeleteGroup(group.Id)">
-                            Delete
-                        </button>
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
+    <div class="row">
+        @foreach (var group in groups)
+        {
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <strong>@group.Name</strong>
+                        @if (group.IsOwner)
+                        {
+                            <span class="badge bg-primary">Owner</span>
+                        }
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">@(group.Description ?? "No description")</p>
+                        <p class="text-muted small">Created: @group.CreatedAt.ToString("yyyy-MM-dd")</p>
+                        
+                        @if (group.IsOwner)
+                        {
+                            <hr />
+                            <div class="mb-2">
+                                <strong>Invite Link</strong>
+                            </div>
+                            
+                            @if (groupInvites.ContainsKey(group.Id) && groupInvites[group.Id] != null)
+                            {
+                                <div class="input-group input-group-sm mb-2">
+                                    <input type="text" class="form-control" value="@GetInviteUrl(groupInvites[group.Id]!.Token)" readonly />
+                                    <button class="btn btn-outline-secondary" type="button" @onclick="() => CopyToClipboard(groupInvites[group.Id]!.Token)">
+                                        Copy
+                                    </button>
+                                </div>
+                            }
+                            else
+                            {
+                                <button class="btn btn-sm btn-outline-primary" @onclick="() => GenerateInviteLink(group.Id)" disabled="@isGeneratingInvite">
+                                    @if (isGeneratingInvite && generatingForGroupId == group.Id)
+                                    {
+                                        <span>Generating...</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Generate Invite Link</span>
+                                    }
+                                </button>
+                            }
+                        }
+                    </div>
+                    @if (group.IsOwner)
+                    {
+                        <div class="card-footer">
+                            <button class="btn btn-sm btn-danger" @onclick="() => DeleteGroup(group.Id)">
+                                Delete Group
+                            </button>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@if (copiedMessage != null)
+{
+    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+        <div class="toast show" role="alert">
+            <div class="toast-body">
+                @copiedMessage
+            </div>
+        </div>
+    </div>
 }
 
 @code {
     private List<GroupDto>? groups;
+    private Dictionary<Guid, GroupInviteDto?> groupInvites = new();
     private CreateGroupModel newGroup = new();
     private bool isCreating = false;
+    private bool isGeneratingInvite = false;
+    private Guid? generatingForGroupId = null;
     private string? errorMessage;
     private string? successMessage;
+    private string? copiedMessage;
 
     protected override async Task OnInitializedAsync()
     {
@@ -97,11 +147,34 @@ else
         try
         {
             errorMessage = null;
-            groups = await Http.GetFromJsonAsync<List<GroupDto>>("/api/groups");
+            // Use the scoped endpoint to get only user's groups
+            groups = await Http.GetFromJsonAsync<List<GroupDto>>("/api/users/me/groups");
+            
+            // Load invites for owned groups
+            if (groups != null)
+            {
+                foreach (var group in groups.Where(g => g.IsOwner))
+                {
+                    await LoadGroupInvites(group.Id);
+                }
+            }
         }
         catch (Exception ex)
         {
             errorMessage = $"Failed to load groups: {ex.Message}";
+        }
+    }
+
+    private async Task LoadGroupInvites(Guid groupId)
+    {
+        try
+        {
+            var invites = await Http.GetFromJsonAsync<List<GroupInviteDto>>($"/api/groups/{groupId}/invites");
+            groupInvites[groupId] = invites?.FirstOrDefault(i => i.IsActive);
+        }
+        catch
+        {
+            groupInvites[groupId] = null;
         }
     }
 
@@ -117,7 +190,7 @@ else
             
             if (response.IsSuccessStatusCode)
             {
-                successMessage = "Group created successfully!";
+                successMessage = "Group created successfully! You are now the owner.";
                 newGroup = new CreateGroupModel();
                 await LoadGroups();
             }
@@ -137,6 +210,59 @@ else
         }
     }
 
+    private async Task GenerateInviteLink(Guid groupId)
+    {
+        try
+        {
+            isGeneratingInvite = true;
+            generatingForGroupId = groupId;
+            errorMessage = null;
+
+            var response = await Http.PostAsync($"/api/groups/{groupId}/invites", null);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var invite = await response.Content.ReadFromJsonAsync<GroupInviteDto>();
+                if (invite != null)
+                {
+                    groupInvites[groupId] = invite;
+                    successMessage = "Invite link generated! Share it with people you want to invite.";
+                }
+            }
+            else
+            {
+                var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+                errorMessage = error?.error ?? "Failed to generate invite link";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isGeneratingInvite = false;
+            generatingForGroupId = null;
+        }
+    }
+
+    private string GetInviteUrl(string token)
+    {
+        return $"{Navigation.BaseUri}invite/{token}";
+    }
+
+    private async Task CopyToClipboard(string token)
+    {
+        // Note: In a real app, you'd use JavaScript interop for clipboard
+        // For now, show the URL in a message
+        copiedMessage = $"Share this link: {GetInviteUrl(token)}";
+        StateHasChanged();
+        
+        await Task.Delay(5000);
+        copiedMessage = null;
+        StateHasChanged();
+    }
+
     private async Task DeleteGroup(Guid id)
     {
         try
@@ -150,6 +276,10 @@ else
             {
                 successMessage = "Group deleted successfully!";
                 await LoadGroups();
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                errorMessage = "Only the group owner can delete the group.";
             }
             else
             {
@@ -168,7 +298,19 @@ else
         public Guid Id { get; set; }
         public string Name { get; set; } = string.Empty;
         public string? Description { get; set; }
+        public Guid OwnerId { get; set; }
+        public bool IsOwner { get; set; }
         public DateTime CreatedAt { get; set; }
+    }
+
+    public class GroupInviteDto
+    {
+        public Guid Id { get; set; }
+        public Guid GroupId { get; set; }
+        public string GroupName { get; set; } = string.Empty;
+        public string Token { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+        public bool IsActive { get; set; }
     }
 
     public class CreateGroupModel

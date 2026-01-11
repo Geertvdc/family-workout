@@ -35,6 +35,12 @@ public class PostgresUserRepository : IUserRepository
             .FirstOrDefaultAsync(u => u.Email == email);
     }
 
+    public async Task<User?> GetByEntraObjectIdAsync(string entraObjectId)
+    {
+        return await _context.Users
+            .FirstOrDefaultAsync(u => u.EntraObjectId == entraObjectId);
+    }
+
     public async Task AddAsync(User user)
     {
         await _context.Users.AddAsync(user);

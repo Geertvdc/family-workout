@@ -35,6 +35,16 @@ public class UserService
             throw new ArgumentException("Email must be 255 characters or less.", nameof(command.Email));
         }
 
+        // Check for duplicate EntraObjectId (if provided)
+        if (!string.IsNullOrWhiteSpace(command.EntraObjectId))
+        {
+            var existingByEntraId = await _repository.GetByEntraObjectIdAsync(command.EntraObjectId);
+            if (existingByEntraId != null)
+            {
+                throw new InvalidOperationException($"A user with this Entra Object ID already exists.");
+            }
+        }
+
         // Check for duplicate username
         var existingByUsername = await _repository.GetByUsernameAsync(command.Username);
         if (existingByUsername != null)
@@ -53,6 +63,7 @@ public class UserService
         var user = new User
         {
             Id = Guid.NewGuid(),
+            EntraObjectId = command.EntraObjectId?.Trim(),
             Username = command.Username.Trim(),
             Email = command.Email.Trim(),
             CreatedAt = DateTime.UtcNow
@@ -78,6 +89,12 @@ public class UserService
         }
 
         return ToDto(user);
+    }
+
+    public async Task<UserDto?> GetByEntraObjectIdAsync(string entraObjectId)
+    {
+        var user = await _repository.GetByEntraObjectIdAsync(entraObjectId);
+        return user != null ? ToDto(user) : null;
     }
 
     public async Task<UserDto> UpdateAsync(UpdateUserCommand command)
@@ -149,6 +166,7 @@ public class UserService
     {
         return new UserDto(
             user.Id,
+            user.EntraObjectId,
             user.Username,
             user.Email,
             user.CreatedAt
