@@ -1,8 +1,10 @@
 @page "/setup-wod"
 @using System.Net.Http.Json
-@using FamilyFitness.Blazor.Models
+@using FamilyFitness.Application
+@using FamilyFitness.Blazor.Services
 @inject HttpClient Http
 @inject NavigationManager Navigation
+@inject IUserContextService UserContext
 @rendermode InteractiveServer
 
 <PageTitle>FFWOD - Setup Workout</PageTitle>
@@ -23,13 +25,45 @@
             </div>
         </div>
     }
+    else if (currentUser == null)
+    {
+        <div class="alert alert-warning">
+            <h4>Authentication Required</h4>
+            <p>Please log in to create workouts.</p>
+        </div>
+    }
+    else if (selectedGroupId == null)
+    {
+        <!-- No Group Selected - Redirect back to Home -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h2>⚠️ No Group Selected</h2>
+                <p>You need to select a group before creating a workout.</p>
+                
+                <div class="mt-4">
+                    <NavLink href="/" class="btn btn-primary btn-lg">
+                        ← Back to Home
+                    </NavLink>
+                </div>
+            </div>
+        </div>
+    }
     else if (currentStep == 1)
     {
         <!-- Step 1: Select Workout Types -->
         <div class="card mb-4">
             <div class="card-body">
                 <h2>Step 1: Select 4 Workout Types</h2>
-                <p>Choose the exercises for today's workout</p>
+                <p>Choose the exercises for today's workout for <strong>@selectedGroupName</strong></p>
+                
+                <!-- Navigation breadcrumb -->
+                <nav aria-label="breadcrumb" class="mb-3">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><NavLink href="/">Home</NavLink></li>
+                        <li class="breadcrumb-item">@selectedGroupName</li>
+                        <li class="breadcrumb-item active">Workout Types</li>
+                    </ol>
+                </nav>
                 
                 @if (availableWorkoutTypes == null || !availableWorkoutTypes.Any())
                 {
@@ -63,6 +97,9 @@
                     
                     <div class="mt-4">
                         <p>Selected: @selectedWorkoutTypes.Count / 4</p>
+                        <button class="btn btn-secondary btn-lg me-2" @onclick="BackToHome">
+                            ← Back to Home
+                        </button>
                         <button class="btn btn-primary btn-lg" 
                                 @onclick="NextToParticipants"
                                 disabled="@(selectedWorkoutTypes.Count != 4)">
@@ -79,12 +116,22 @@
         <div class="card mb-4">
             <div class="card-body">
                 <h2>Step 2: Select Participants</h2>
-                <p>Who's working out today?</p>
+                <p>Who's working out today from <strong>@selectedGroupName</strong>?</p>
                 
-                @if (availableUsers == null || !availableUsers.Any())
+                <!-- Navigation breadcrumb -->
+                <nav aria-label="breadcrumb" class="mb-3">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><NavLink href="/">Home</NavLink></li>
+                        <li class="breadcrumb-item">@selectedGroupName</li>
+                        <li class="breadcrumb-item"><a href="#" @onclick="BackToWorkoutTypes" @onclick:preventDefault="true">Workout Types</a></li>
+                        <li class="breadcrumb-item active">Participants</li>
+                    </ol>
+                </nav>
+                
+                @if (groupMembers == null || !groupMembers.Any())
                 {
                     <div class="alert alert-warning">
-                        No users available. Please create users first.
+                        No members found in this group. Please invite members first.
                     </div>
                 }
                  else
@@ -98,179 +145,191 @@
                          </button>
                      </div>
                      <div class="participants-grid">
-                        @foreach (var user in availableUsers)
-                        {
-                            var isSelected = selectedParticipants.Contains(user);
-                            var buttonClass = isSelected ? "btn btn-success btn-lg participant-btn selected" : "btn btn-secondary btn-lg participant-btn";
-                            
-                            <button class="@buttonClass" 
-                                    @onclick="() => ToggleParticipant(user)">
-                                @if (isSelected)
-                                {
-                                    <span class="checkmark">✓ </span>
-                                }
-                                <strong>@user.Username</strong>
-                            </button>
-                        }
-                    </div>
-                    
-                    <div class="mt-4">
-                        <p>Selected: @selectedParticipants.Count participant(s)</p>
-                        <button class="btn btn-secondary me-2" @onclick="BackToWorkoutTypes">
-                            Back
-                        </button>
-                        <button class="btn btn-primary btn-lg" 
-                                @onclick="NextToConfirm"
-                                disabled="@(selectedParticipants.Count == 0)">
-                            Next: Review & Start
-                        </button>
-                    </div>
-                }
+                         @foreach (var user in groupMembers)
+                         {
+                             var isSelected = selectedParticipants.Contains(user);
+                             var buttonClass = isSelected ? "btn btn-success btn-lg participant-btn selected" : "btn btn-outline-secondary btn-lg participant-btn";
+                             
+                             <button class="@buttonClass" @onclick="() => ToggleParticipant(user)">
+                                 @if (isSelected)
+                                 {
+                                     <span class="checkmark">✓ </span>
+                                 }
+                                 @user.Username
+                                 <br/>
+                                 <small>@user.Email</small>
+                             </button>
+                         }
+                     </div>
+                     
+                     <div class="mt-4">
+                         <p>Selected: @selectedParticipants.Count participants</p>
+                         <button class="btn btn-secondary btn-lg me-2" @onclick="BackToWorkoutTypes">
+                             ← Back
+                         </button>
+                         <button class="btn btn-primary btn-lg" 
+                                 @onclick="NextToConfirm"
+                                 disabled="@(selectedParticipants.Count == 0)">
+                             Next: Review & Start
+                         </button>
+                     </div>
+                 }
             </div>
         </div>
     }
     else if (currentStep == 3)
     {
-        <!-- Step 3: Confirm and Start -->
-        <div class="review-container">
-            <h2>Review Your Workout</h2>
-            
-            <!-- Workout Stations -->
-            <div class="review-section-card">
-                <div class="review-section-header">
-                    <h3>Workout Stations</h3>
-                    <span class="review-badge">4 Stations</span>
-                </div>
-                <div class="review-stations-grid">
-                    @for (int i = 0; i < selectedWorkoutTypes.Count; i++)
-                    {
-                        var wt = selectedWorkoutTypes[i];
-                        <div class="review-station-card">
-                            <div class="station-number-large">@(i + 1)</div>
-                            <div class="station-details">
-                                <div class="station-name">@wt.Name</div>
-                                @if (!string.IsNullOrEmpty(wt.Description))
-                                {
-                                    <div class="station-description">@wt.Description</div>
-                                }
+        <!-- Step 3: Review and Confirm -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h2>Review & Start Workout</h2>
+                <p>Ready to start the workout for <strong>@selectedGroupName</strong>?</p>
+                
+                <!-- Workout Summary -->
+                <div class="workout-summary">
+                    <div class="summary-section">
+                        <h3>📋 Workout Types (4 Stations)</h3>
+                        <div class="summary-items">
+                            @for (int i = 0; i < selectedWorkoutTypes.Count; i++)
+                            {
+                                <div class="summary-item">
+                                    <span class="station-number">Station @(i + 1)</span>
+                                    <span class="workout-name">@selectedWorkoutTypes[i].Name</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                    
+                    <div class="summary-section">
+                        <h3>👥 Participants (@selectedParticipants.Count)</h3>
+                        <div class="summary-items">
+                            @foreach (var participant in selectedParticipants)
+                            {
+                                <div class="summary-item">
+                                    <span class="participant-name">@participant.Username</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                    
+                    <div class="summary-section">
+                        <h3>⏱️ Workout Format</h3>
+                        <div class="workout-format">
+                            <div class="format-description">
+                                <strong>3 Rounds</strong> × <strong>4 Stations</strong> = <strong>12 Total Intervals</strong>
+                            </div>
+                            <div class="interval-breakdown">
+                                <div class="interval-item">
+                                    <span class="interval-time">10s</span>
+                                    <span class="interval-name">Get Ready</span>
+                                </div>
+                                <div class="interval-separator">+</div>
+                                <div class="interval-item">
+                                    <span class="interval-time">60s</span>
+                                    <span class="interval-name">Work</span>
+                                </div>
+                                <div class="interval-separator">+</div>
+                                <div class="interval-item">
+                                    <span class="interval-time">15s</span>
+                                    <span class="interval-name">Cooldown</span>
+                                </div>
                             </div>
                         </div>
-                    }
-                </div>
-            </div>
-            
-            <!-- Participants -->
-            <div class="review-section-card">
-                <div class="review-section-header">
-                    <h3>Participants</h3>
-                    <span class="review-badge">@selectedParticipants.Count Athletes</span>
-                </div>
-                <div class="review-participants-grid">
-                    @foreach (var user in selectedParticipants)
-                    {
-                        <div class="review-participant-card">
-                            <div class="participant-icon">👤</div>
-                            <div class="participant-name-review">@user.Username</div>
-                        </div>
-                    }
-                </div>
-            </div>
-            
-            <!-- Workout Format Info -->
-            <div class="review-info-card">
-                <h3>Workout Format</h3>
-                <div class="workout-stats">
-                    <div class="workout-stat">
-                        <div class="stat-number">3</div>
-                        <div class="stat-label">Rounds</div>
-                    </div>
-                    <div class="workout-stat-separator">×</div>
-                    <div class="workout-stat">
-                        <div class="stat-number">4</div>
-                        <div class="stat-label">Stations</div>
-                    </div>
-                    <div class="workout-stat-separator">=</div>
-                    <div class="workout-stat">
-                        <div class="stat-number">12</div>
-                        <div class="stat-label">Intervals</div>
                     </div>
                 </div>
-                <div class="interval-breakdown">
-                    <div class="interval-item">
-                        <span class="interval-time">5s</span>
-                        <span class="interval-name">Get Ready</span>
-                    </div>
-                    <div class="interval-separator">+</div>
-                    <div class="interval-item">
-                        <span class="interval-time">60s</span>
-                        <span class="interval-name">Work</span>
-                    </div>
-                    <div class="interval-separator">+</div>
-                    <div class="interval-item">
-                        <span class="interval-time">15s</span>
-                        <span class="interval-name">Cooldown</span>
-                    </div>
+                
+                <!-- Action Buttons -->
+                <div class="review-actions">
+                    <button class="btn btn-secondary btn-lg" @onclick="BackToParticipants">
+                        ← Back
+                    </button>
+                    <button class="btn btn-success btn-lg btn-start-workout" 
+                            @onclick="CreateAndStartWorkout"
+                            disabled="@creating">
+                        @(creating ? "CREATING..." : "🔥 START WORKOUT! 🔥")
+                    </button>
                 </div>
-            </div>
-            
-            <!-- Action Buttons -->
-            <div class="review-actions">
-                <button class="btn btn-secondary btn-lg" @onclick="BackToParticipants">
-                    ← Back
-                </button>
-                <button class="btn btn-success btn-lg btn-start-workout" 
-                        @onclick="CreateAndStartWorkout"
-                        disabled="@creating">
-                    @(creating ? "CREATING..." : "🔥 START WORKOUT! 🔥")
-                </button>
             </div>
         </div>
     }
 </div>
 
 @code {
-    private int currentStep = 1;
+    private int currentStep = 1; // Start with workout types selection, skip group selection
     private bool loading = true;
     private bool creating = false;
     private string? error;
-
-    // Default group and creator IDs for MVP (matches seeded data)
-    private readonly Guid defaultGroupId = AppConstants.DefaultGroupId;
-    private readonly Guid defaultCreatorId = AppConstants.DefaultCreatorId;
+    private UserDto? currentUser;
+    private Guid? selectedGroupId;
+    private string selectedGroupName = "";
 
     private List<WorkoutTypeDto> availableWorkoutTypes = new();
     private List<WorkoutTypeDto> selectedWorkoutTypes = new();
     
-    private List<UserDto> availableUsers = new();
+    private List<UserDto> groupMembers = new();
     private List<UserDto> selectedParticipants = new();
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadData();
+        await LoadCurrentUser();
+        await InitializeGroupSelection();
+        await LoadWorkoutTypes();
+        loading = false;
     }
 
-    private async Task LoadData()
+    private async Task InitializeGroupSelection()
     {
-        loading = true;
-        error = null;
-
         try
         {
-            // Load workout types
-            var workoutTypesResponse = await Http.GetFromJsonAsync<List<WorkoutTypeDto>>("/api/workout-types");
-            availableWorkoutTypes = workoutTypesResponse ?? new();
-
-            // Load users
-            var usersResponse = await Http.GetFromJsonAsync<List<UserDto>>("/api/users");
-            availableUsers = usersResponse ?? new();
+            // Get the currently selected group from the user context
+            selectedGroupId = UserContext.GetSessionGroupId();
+            
+            if (selectedGroupId.HasValue)
+            {
+                // Load group details to get the name
+                var userGroups = await UserContext.GetUserGroupsAsync();
+                var selectedGroup = userGroups.FirstOrDefault(g => g.Id == selectedGroupId.Value);
+                selectedGroupName = selectedGroup?.Name ?? "Unknown Group";
+                
+                // Since we have a group, we can start at step 1 (workout types)
+                currentStep = 1;
+            }
+            else
+            {
+                // No group selected, user should go back to home
+                selectedGroupId = null;
+                currentStep = 0; // This will show the "no group selected" message
+            }
         }
         catch (Exception ex)
         {
-            error = $"Failed to load data: {ex.Message}";
+            error = $"Failed to initialize group selection: {ex.Message}";
+            currentStep = 0;
         }
-        finally
+    }
+
+    private async Task LoadCurrentUser()
+    {
+        try
         {
-            loading = false;
+            currentUser = await UserContext.GetCurrentUserAsync();
+        }
+        catch (Exception ex)
+        {
+            error = $"Failed to load user: {ex.Message}";
+        }
+    }
+
+    private async Task LoadWorkoutTypes()
+    {
+        try
+        {
+            var workoutTypesResponse = await Http.GetFromJsonAsync<List<WorkoutTypeDto>>("/api/workout-types");
+            availableWorkoutTypes = workoutTypesResponse ?? new();
+        }
+        catch (Exception ex)
+        {
+            error = $"Failed to load workout types: {ex.Message}";
         }
     }
 
@@ -284,6 +343,33 @@
         {
             selectedWorkoutTypes.Add(workoutType);
         }
+    }
+
+    private async Task NextToParticipants()
+    {
+        if (selectedGroupId.HasValue)
+        {
+            try
+            {
+                // Load group members when moving to participants step
+                groupMembers = await UserContext.GetGroupMembersAsync(selectedGroupId.Value);
+            }
+            catch (Exception ex)
+            {
+                error = $"Failed to load group members: {ex.Message}";
+            }
+        }
+        currentStep = 2;
+    }
+
+    private void BackToWorkoutTypes()
+    {
+        currentStep = 1;
+    }
+
+    private void BackToHome()
+    {
+        Navigation.NavigateTo("/");
     }
 
     private void ToggleParticipant(UserDto user)
@@ -300,23 +386,12 @@
 
     private void SelectAllParticipants()
     {
-        selectedParticipants.Clear();
-        selectedParticipants.AddRange(availableUsers);
+        selectedParticipants = new List<UserDto>(groupMembers);
     }
 
     private void ClearAllParticipants()
     {
         selectedParticipants.Clear();
-    }
-
-    private void NextToParticipants()
-    {
-        currentStep = 2;
-    }
-
-    private void BackToWorkoutTypes()
-    {
-        currentStep = 1;
     }
 
     private void NextToConfirm()
@@ -331,16 +406,22 @@
 
     private async Task CreateAndStartWorkout()
     {
+        if (!selectedGroupId.HasValue || currentUser == null)
+        {
+            error = "Missing group or user context";
+            return;
+        }
+
         creating = true;
         error = null;
 
         try
         {
-            // 1. Create workout session
+            // 1. Create workout session with proper user context
             var createSessionCommand = new
             {
-                GroupId = defaultGroupId,
-                CreatorId = defaultCreatorId,
+                GroupId = selectedGroupId.Value,
+                CreatorId = currentUser.Id,
                 SessionDate = DateTime.UtcNow
             };
 
@@ -409,4 +490,3 @@
         }
     }
 }
-

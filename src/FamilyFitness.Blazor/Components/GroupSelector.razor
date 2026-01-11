@@ -1,0 +1,83 @@
+@using FamilyFitness.Application
+@using FamilyFitness.Blazor.Services
+@inject IUserContextService UserContext
+
+<div class="group-selector mb-3">
+    <label for="group-select" class="form-label">Select Group:</label>
+    @if (groups.Any())
+    {
+        <select id="group-select" class="form-select" @onchange="HandleGroupChange" value="@SelectedGroupId">
+            <option value="">-- Select a group --</option>
+            @foreach (var group in groups)
+            {
+                <option value="@group.Id">
+                    @group.Name (@group.IsOwner ? "Owner" : "Member") - @memberCounts.GetValueOrDefault(group.Id, 0) members
+                </option>
+            }
+        </select>
+    }
+    else
+    {
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>
+            You are not a member of any groups yet. 
+            <a href="/groups" class="alert-link">Create or join a group</a> to get started.
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid? SelectedGroupId { get; set; }
+    [Parameter] public EventCallback<Guid?> SelectedGroupIdChanged { get; set; }
+    [Parameter] public EventCallback<GroupDto?> OnGroupSelected { get; set; }
+
+    private List<GroupDto> groups = new();
+    private Dictionary<Guid, int> memberCounts = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadGroups();
+    }
+
+    private async Task LoadGroups()
+    {
+        try
+        {
+            groups = await UserContext.GetUserGroupsAsync();
+            
+            // Load member counts for each group
+            foreach (var group in groups)
+            {
+                var members = await UserContext.GetGroupMembersAsync(group.Id);
+                memberCounts[group.Id] = members.Count;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading groups: {ex.Message}");
+            groups = new List<GroupDto>();
+        }
+    }
+
+    private async Task HandleGroupChange(ChangeEventArgs e)
+    {
+        var selectedValue = e.Value?.ToString();
+        Guid? newGroupId = string.IsNullOrEmpty(selectedValue) ? null : Guid.Parse(selectedValue);
+        
+        SelectedGroupId = newGroupId;
+        UserContext.SetSessionGroupId(newGroupId);
+        
+        await SelectedGroupIdChanged.InvokeAsync(newGroupId);
+        
+        var selectedGroup = newGroupId.HasValue ? groups.FirstOrDefault(g => g.Id == newGroupId.Value) : null;
+        await OnGroupSelected.InvokeAsync(selectedGroup);
+        
+        StateHasChanged();
+    }
+
+    public async Task RefreshGroups()
+    {
+        await LoadGroups();
+        StateHasChanged();
+    }
+}

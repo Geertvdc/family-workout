@@ -3,125 +3,241 @@
 @using FamilyFitness.Blazor.Models
 @inject HttpClient Http
 @inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
 @rendermode InteractiveServer
 
-<h3>My Groups</h3>
-
-@if (errorMessage != null)
-{
-    <div class="alert alert-danger">@errorMessage</div>
-}
-
-@if (successMessage != null)
-{
-    <div class="alert alert-success">@successMessage</div>
-}
-
-<div class="row mb-4">
-    <div class="col-md-6">
-        <h4>Create New Group</h4>
-        <EditForm Model="@newGroup" OnValidSubmit="@CreateGroup">
-            <div class="mb-3">
-                <label class="form-label">Name *</label>
-                <InputText class="form-control" @bind-Value="newGroup.Name" required />
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Description</label>
-                <InputTextArea class="form-control" @bind-Value="newGroup.Description" rows="3" />
-            </div>
-            <button type="submit" class="btn btn-primary" disabled="@isCreating">
-                @if (isCreating)
-                {
-                    <span>Creating...</span>
-                }
-                else
-                {
-                    <span>Create Group</span>
-                }
-            </button>
-        </EditForm>
+<div class="container-fluid px-3">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="mb-0">My Groups</h3>
+        <button class="btn btn-primary d-md-none" @onclick="ToggleCreateForm">
+            @if (showCreateForm) { <i class="bi bi-x-lg"></i> } else { <i class="bi bi-plus-lg"></i> }
+        </button>
     </div>
-</div>
 
-<h4>Your Groups</h4>
+    @if (errorMessage != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+        </div>
+    }
 
-@if (groups == null)
-{
-    <p><em>Loading...</em></p>
-}
-else if (!groups.Any())
-{
-    <p><em>You're not a member of any groups yet. Create one above or use an invite link to join!</em></p>
-}
-else
-{
-    <div class="row">
-        @foreach (var group in groups)
-        {
-            <div class="col-md-6 col-lg-4 mb-4">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <strong>@group.Name</strong>
-                        @if (group.IsOwner)
-                        {
-                            <span class="badge bg-primary">Owner</span>
-                        }
-                    </div>
-                    <div class="card-body">
-                        <p class="card-text">@(group.Description ?? "No description")</p>
-                        <p class="text-muted small">Created: @group.CreatedAt.ToString("yyyy-MM-dd")</p>
-                        
-                        @if (group.IsOwner)
-                        {
-                            <hr />
-                            <div class="mb-2">
-                                <strong>Invite Link</strong>
+    @if (successMessage != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            @successMessage
+            <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+        </div>
+    }
+
+    <!-- Mobile collapsible create form, always visible on desktop -->
+    <div class="@(showCreateForm ? "d-block" : "d-none d-md-block") mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Create New Group</h5>
+            </div>
+            <div class="card-body">
+                <EditForm Model="@newGroup" OnValidSubmit="@CreateGroup">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Name *</label>
+                                <InputText class="form-control" @bind-Value="newGroup.Name" placeholder="My Family Fitness Group" required />
                             </div>
-                            
-                            @if (groupInvites.ContainsKey(group.Id) && groupInvites[group.Id] != null)
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Description</label>
+                                <InputText class="form-control" @bind-Value="newGroup.Description" placeholder="Optional description" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary" disabled="@isCreating">
+                            @if (isCreating)
                             {
-                                <div class="input-group input-group-sm mb-2">
-                                    <input type="text" class="form-control" value="@GetInviteUrl(groupInvites[group.Id]!.Token)" readonly />
-                                    <button class="btn btn-outline-secondary" type="button" @onclick="() => CopyToClipboard(groupInvites[group.Id]!.Token)">
-                                        Copy
-                                    </button>
-                                </div>
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                <span>Creating...</span>
                             }
                             else
                             {
-                                <button class="btn btn-sm btn-outline-primary" @onclick="() => GenerateInviteLink(group.Id)" disabled="@isGeneratingInvite">
-                                    @if (isGeneratingInvite && generatingForGroupId == group.Id)
+                                <i class="bi bi-plus-circle me-1"></i>
+                                <span>Create Group</span>
+                            }
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary d-md-none" @onclick="ToggleCreateForm">
+                            Cancel
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0">Your Groups</h4>
+        @if (groups != null && groups.Any())
+        {
+            <small class="text-muted">@groups.Count group@(groups.Count == 1 ? "" : "s")</small>
+        }
+    </div>
+
+    @if (groups == null)
+    {
+        <div class="d-flex justify-content-center py-5">
+            <div class="text-center">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="text-muted">Loading your groups...</p>
+            </div>
+        </div>
+    }
+    else if (!groups.Any())
+    {
+        <div class="text-center py-5">
+            <div class="mb-3">
+                <i class="bi bi-people display-1 text-muted"></i>
+            </div>
+            <h5 class="text-muted mb-3">No groups yet</h5>
+            <p class="text-muted">Create your first group above or use an invite link to join an existing one!</p>
+        </div>
+    }
+    else
+    {
+        <div class="row g-3">
+            @foreach (var group in groups)
+            {
+                <div class="col-12 col-sm-6 col-lg-4">
+                    <div class="card h-100 @(group.IsOwner ? "border-primary" : "")">
+                        <div class="card-header d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="card-title mb-1">@group.Name</h6>
+                                <div class="d-flex gap-2 align-items-center">
+                                    @if (group.IsOwner)
                                     {
-                                        <span>Generating...</span>
+                                        <span class="badge bg-primary">Owner</span>
                                     }
                                     else
                                     {
-                                        <span>Generate Invite Link</span>
+                                        <span class="badge bg-secondary">Member</span>
                                     }
-                                </button>
+                                    @if (groupMemberCounts.ContainsKey(group.Id))
+                                    {
+                                        <small class="text-muted">
+                                            <i class="bi bi-people me-1"></i>@groupMemberCounts[group.Id]
+                                        </small>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            @if (!string.IsNullOrEmpty(group.Description))
+                            {
+                                <p class="card-text mb-2">@group.Description</p>
                             }
+                            <p class="text-muted small mb-0">
+                                <i class="bi bi-calendar3 me-1"></i>Created @group.CreatedAt.ToString("MMM dd, yyyy")
+                            </p>
+                            
+                            @if (group.IsOwner)
+                            {
+                                <hr class="my-3" />
+                                <div class="mb-2">
+                                    <strong class="small">Invite Link</strong>
+                                </div>
+                                
+                                @if (groupInvites.ContainsKey(group.Id) && groupInvites[group.Id] != null)
+                                {
+                                    <div class="input-group input-group-sm mb-2">
+                                        <input type="text" class="form-control" value="@GetInviteUrl(groupInvites[group.Id]!.Token)" readonly />
+                                        <button class="btn btn-outline-primary" type="button" @onclick="() => CopyToClipboard(groupInvites[group.Id]!.Token)">
+                                            <i class="bi bi-clipboard"></i>
+                                        </button>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-sm btn-outline-primary w-100" @onclick="() => GenerateInviteLink(group.Id)" disabled="@(isGeneratingInvite && generatingForGroupId == group.Id)">
+                                        @if (isGeneratingInvite && generatingForGroupId == group.Id)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                            <span>Generating...</span>
+                                        }
+                                        else
+                                        {
+                                            <i class="bi bi-link-45deg me-1"></i>
+                                            <span>Generate Invite Link</span>
+                                        }
+                                    </button>
+                                }
+                            }
+                        </div>
+                        @if (group.IsOwner)
+                        {
+                            <div class="card-footer bg-transparent">
+                                <button class="btn btn-sm btn-outline-danger w-100" @onclick="() => ConfirmDeleteGroup(group.Id, group.Name)">
+                                    <i class="bi bi-trash me-1"></i>
+                                    Delete Group
+                                </button>
+                            </div>
                         }
                     </div>
-                    @if (group.IsOwner)
-                    {
-                        <div class="card-footer">
-                            <button class="btn btn-sm btn-danger" @onclick="() => DeleteGroup(group.Id)">
-                                Delete Group
-                            </button>
-                        </div>
-                    }
                 </div>
+            }
+        </div>
+    }
+</div>
+
+<!-- Toast notifications -->
+@if (copiedMessage != null)
+{
+    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1055">
+        <div class="toast show" role="alert">
+            <div class="toast-header">
+                <i class="bi bi-check-circle-fill text-success me-2"></i>
+                <strong class="me-auto">Success</strong>
+                <button type="button" class="btn-close" @onclick="() => copiedMessage = null"></button>
             </div>
-        }
+            <div class="toast-body">
+                @copiedMessage
+            </div>
+        </div>
     </div>
 }
 
-@if (copiedMessage != null)
+<!-- Confirmation Modal -->
+@if (showDeleteConfirm)
 {
-    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
-        <div class="toast show" role="alert">
-            <div class="toast-body">
-                @copiedMessage
+    <div class="modal d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirm Deletion</h5>
+                    <button type="button" class="btn-close" @onclick="CancelDelete"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete the group <strong>"@deleteGroupName"</strong>?</p>
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        This action cannot be undone. All group data, workout sessions, and member relationships will be permanently deleted.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CancelDelete">Cancel</button>
+                    <button type="button" class="btn btn-danger" @onclick="ConfirmDelete" disabled="@isDeletingGroup">
+                        @if (isDeletingGroup)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            <span>Deleting...</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-trash me-1"></i>
+                            <span>Delete Group</span>
+                        }
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -130,6 +246,7 @@ else
 @code {
     private List<GroupDto>? groups;
     private Dictionary<Guid, GroupInviteDto?> groupInvites = new();
+    private Dictionary<Guid, int> groupMemberCounts = new();
     private CreateGroupModel newGroup = new();
     private bool isCreating = false;
     private bool isGeneratingInvite = false;
@@ -137,10 +254,20 @@ else
     private string? errorMessage;
     private string? successMessage;
     private string? copiedMessage;
+    private bool showCreateForm = false;
+    private bool showDeleteConfirm = false;
+    private bool isDeletingGroup = false;
+    private Guid deleteGroupId = Guid.Empty;
+    private string deleteGroupName = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadGroups();
+    }
+
+    private void ToggleCreateForm()
+    {
+        showCreateForm = !showCreateForm;
     }
 
     private async Task LoadGroups()
@@ -151,12 +278,16 @@ else
             // Use the scoped endpoint to get only user's groups
             groups = await Http.GetFromJsonAsync<List<GroupDto>>("/api/users/me/groups");
             
-            // Load invites for owned groups
+            // Load invites and member counts for owned groups
             if (groups != null)
             {
-                foreach (var group in groups.Where(g => g.IsOwner))
+                foreach (var group in groups)
                 {
-                    await LoadGroupInvites(group.Id);
+                    if (group.IsOwner)
+                    {
+                        await LoadGroupInvites(group.Id);
+                    }
+                    await LoadGroupMemberCount(group.Id);
                 }
             }
         }
@@ -179,6 +310,19 @@ else
         }
     }
 
+    private async Task LoadGroupMemberCount(Guid groupId)
+    {
+        try
+        {
+            var members = await Http.GetFromJsonAsync<List<GroupMembershipDto>>($"/api/groups/{groupId}/members");
+            groupMemberCounts[groupId] = members?.Count ?? 0;
+        }
+        catch
+        {
+            groupMemberCounts[groupId] = 0;
+        }
+    }
+
     private async Task CreateGroup()
     {
         try
@@ -193,6 +337,7 @@ else
             {
                 successMessage = "Group created successfully! You are now the owner.";
                 newGroup = new CreateGroupModel();
+                showCreateForm = false; // Hide form on mobile after creation
                 await LoadGroups();
             }
             else
@@ -254,28 +399,58 @@ else
 
     private async Task CopyToClipboard(string token)
     {
-        // Note: In a real app, you'd use JavaScript interop for clipboard
-        // For now, show the URL in a message
-        copiedMessage = $"Share this link: {GetInviteUrl(token)}";
-        StateHasChanged();
-        
-        await Task.Delay(5000);
-        copiedMessage = null;
-        StateHasChanged();
+        try
+        {
+            var url = GetInviteUrl(token);
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", url);
+            copiedMessage = "Invite link copied to clipboard!";
+            
+            // Auto-hide toast after 3 seconds
+            StateHasChanged();
+            await Task.Delay(3000);
+            copiedMessage = null;
+            StateHasChanged();
+        }
+        catch
+        {
+            // Fallback for browsers without clipboard API
+            copiedMessage = $"Copy this link: {GetInviteUrl(token)}";
+            StateHasChanged();
+            
+            await Task.Delay(5000);
+            copiedMessage = null;
+            StateHasChanged();
+        }
     }
 
-    private async Task DeleteGroup(Guid id)
+    private void ConfirmDeleteGroup(Guid groupId, string groupName)
+    {
+        deleteGroupId = groupId;
+        deleteGroupName = groupName;
+        showDeleteConfirm = true;
+    }
+
+    private void CancelDelete()
+    {
+        showDeleteConfirm = false;
+        deleteGroupId = Guid.Empty;
+        deleteGroupName = string.Empty;
+    }
+
+    private async Task ConfirmDelete()
     {
         try
         {
+            isDeletingGroup = true;
             errorMessage = null;
             successMessage = null;
 
-            var response = await Http.DeleteAsync($"/api/groups/{id}");
+            var response = await Http.DeleteAsync($"/api/groups/{deleteGroupId}");
             
             if (response.IsSuccessStatusCode)
             {
-                successMessage = "Group deleted successfully!";
+                successMessage = $"Group \"{deleteGroupName}\" deleted successfully!";
+                CancelDelete();
                 await LoadGroups();
             }
             else if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
@@ -291,6 +466,10 @@ else
         catch (Exception ex)
         {
             errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isDeletingGroup = false;
         }
     }
 
