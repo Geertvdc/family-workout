@@ -1,5 +1,6 @@
 @page "/workout-session-workout-types"
 @using System.Net.Http.Json
+@using FamilyFitness.Blazor.Models
 @inject HttpClient Http
 @rendermode InteractiveServer
 
@@ -226,42 +227,11 @@ else
         }
     }
 
-    public class WorkoutSessionWorkoutTypeDto
-    {
-        public Guid Id { get; set; }
-        public Guid WorkoutSessionId { get; set; }
-        public string WorkoutTypeId { get; set; } = string.Empty;
-        public int StationIndex { get; set; }
-    }
-
     public class CreateWorkoutSessionWorkoutTypeModel
     {
         public string WorkoutSessionId { get; set; } = string.Empty;
         public string WorkoutTypeId { get; set; } = string.Empty;
         public int StationIndex { get; set; } = 1;
     }
-
-    public class WorkoutSessionDto
-    {
-        public Guid Id { get; set; }
-        public Guid GroupId { get; set; }
-        public Guid CreatorId { get; set; }
-        public DateTime SessionDate { get; set; }
-        public DateTime? StartedAt { get; set; }
-        public DateTime? EndedAt { get; set; }
-        public int Status { get; set; }
-        public DateTime CreatedAt { get; set; }
-    }
-
-    public class WorkoutTypeDto
-    {
-        public string Id { get; set; } = string.Empty;
-        public string Name { get; set; } = string.Empty;
-        public string? Description { get; set; }
-    }
-
-    public class ErrorResponse
-    {
-        public string error { get; set; } = string.Empty;
-    }
 }
+

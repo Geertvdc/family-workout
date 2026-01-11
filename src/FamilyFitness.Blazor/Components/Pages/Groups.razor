@@ -1,5 +1,6 @@
 @page "/groups"
 @using System.Net.Http.Json
+@using FamilyFitness.Blazor.Models
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @rendermode InteractiveServer
@@ -293,34 +294,9 @@ else
         }
     }
 
-    public class GroupDto
-    {
-        public Guid Id { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public string? Description { get; set; }
-        public Guid OwnerId { get; set; }
-        public bool IsOwner { get; set; }
-        public DateTime CreatedAt { get; set; }
-    }
-
-    public class GroupInviteDto
-    {
-        public Guid Id { get; set; }
-        public Guid GroupId { get; set; }
-        public string GroupName { get; set; } = string.Empty;
-        public string Token { get; set; } = string.Empty;
-        public DateTime CreatedAt { get; set; }
-        public bool IsActive { get; set; }
-    }
-
     public class CreateGroupModel
     {
         public string Name { get; set; } = string.Empty;
         public string? Description { get; set; }
-    }
-
-    public class ErrorResponse
-    {
-        public string error { get; set; } = string.Empty;
     }
 }

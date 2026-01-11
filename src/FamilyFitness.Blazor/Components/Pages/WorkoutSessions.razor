@@ -1,5 +1,6 @@
 @page "/workout-sessions"
 @using System.Net.Http.Json
+@using FamilyFitness.Blazor.Models
 @inject HttpClient Http
 @rendermode InteractiveServer
 
@@ -224,43 +225,11 @@ else
         }
     }
 
-    public class WorkoutSessionDto
-    {
-        public Guid Id { get; set; }
-        public Guid GroupId { get; set; }
-        public Guid CreatorId { get; set; }
-        public DateTime SessionDate { get; set; }
-        public DateTime? StartedAt { get; set; }
-        public DateTime? EndedAt { get; set; }
-        public int Status { get; set; }
-        public DateTime CreatedAt { get; set; }
-    }
-
     public class CreateWorkoutSessionModel
     {
         public string GroupId { get; set; } = string.Empty;
         public string CreatorId { get; set; } = string.Empty;
         public DateTime SessionDate { get; set; } = DateTime.Today;
     }
-
-    public class GroupDto
-    {
-        public Guid Id { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public string? Description { get; set; }
-        public DateTime CreatedAt { get; set; }
-    }
-
-    public class UserDto
-    {
-        public Guid Id { get; set; }
-        public string Username { get; set; } = string.Empty;
-        public string Email { get; set; } = string.Empty;
-        public DateTime CreatedAt { get; set; }
-    }
-
-    public class ErrorResponse
-    {
-        public string error { get; set; } = string.Empty;
-    }
 }
+

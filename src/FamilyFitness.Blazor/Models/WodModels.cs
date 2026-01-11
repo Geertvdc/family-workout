@@ -1,17 +1,5 @@
 namespace FamilyFitness.Blazor.Models;
 
-public class SessionDto
-{
-    public Guid Id { get; set; }
-    public Guid GroupId { get; set; }
-    public Guid CreatorId { get; set; }
-    public DateTime SessionDate { get; set; }
-    public DateTime? StartedAt { get; set; }
-    public DateTime? EndedAt { get; set; }
-    public WorkoutSessionStatus Status { get; set; }
-    public DateTime CreatedAt { get; set; }
-}
-
 public class SessionAssignmentDto
 {
     public Guid SessionId { get; set; }
@@ -41,12 +29,4 @@ public enum TimerPhase
     Ready,
     Work,
     Cooldown
-}
-
-public enum WorkoutSessionStatus
-{
-    Pending = 0,
-    Active = 1,
-    Completed = 2,
-    Cancelled = 3
 }

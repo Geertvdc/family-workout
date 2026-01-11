@@ -153,7 +153,7 @@
     private const int TotalRounds = 3;
     private const int StationsPerRound = 4;
 
-    private SessionDto? session;
+    private WorkoutSessionDto? session;
     private SessionAssignmentDto? assignments;
     private string? error;
     private bool showCancelDialog = false;
@@ -178,7 +178,7 @@
     {
         try
         {
-            session = await Http.GetFromJsonAsync<SessionDto>($"/api/workout-sessions/{SessionId}");
+            session = await Http.GetFromJsonAsync<WorkoutSessionDto>($"/api/workout-sessions/{SessionId}");
             assignments = await Http.GetFromJsonAsync<SessionAssignmentDto>($"/api/workout-sessions/{SessionId}/assignments");
 
             if (session?.Status == WorkoutSessionStatus.Pending)
@@ -187,7 +187,7 @@
                 var response = await Http.PostAsync($"/api/workout-sessions/{SessionId}/start", null);
                 if (response.IsSuccessStatusCode)
                 {
-                    session = await response.Content.ReadFromJsonAsync<SessionDto>();
+                    session = await response.Content.ReadFromJsonAsync<WorkoutSessionDto>();
                     StartTimer();
                 }
             }
@@ -305,7 +305,7 @@
             var response = await Http.PostAsync($"/api/workout-sessions/{SessionId}/complete", null);
             if (response.IsSuccessStatusCode)
             {
-                session = await response.Content.ReadFromJsonAsync<SessionDto>();
+                session = await response.Content.ReadFromJsonAsync<WorkoutSessionDto>();
                 
                 // Trigger confetti celebration
                 try
@@ -345,7 +345,7 @@
             var response = await Http.PostAsync($"/api/workout-sessions/{SessionId}/cancel", null);
             if (response.IsSuccessStatusCode)
             {
-                session = await response.Content.ReadFromJsonAsync<SessionDto>();
+                session = await response.Content.ReadFromJsonAsync<WorkoutSessionDto>();
                 showCancelDialog = false;
                 StateHasChanged();
             }
