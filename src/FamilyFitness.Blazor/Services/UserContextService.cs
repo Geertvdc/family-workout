@@ -9,6 +9,7 @@ namespace FamilyFitness.Blazor.Services;
 public class UserContextService : IUserContextService
 {
     private readonly HttpClient _httpClient;
+    private readonly object _lockObject = new object();
     private Guid? _sessionGroupId; // In-memory only, not persisted across browser restarts
     private UserDto? _cachedCurrentUser;
     private List<GroupDto>? _cachedUserGroups;
@@ -21,13 +22,20 @@ public class UserContextService : IUserContextService
     /// <inheritdoc />
     public async Task<UserDto?> GetCurrentUserAsync()
     {
-        if (_cachedCurrentUser != null)
-            return _cachedCurrentUser;
+        lock (_lockObject)
+        {
+            if (_cachedCurrentUser != null)
+                return _cachedCurrentUser;
+        }
 
         try
         {
-            _cachedCurrentUser = await _httpClient.GetFromJsonAsync<UserDto>("/api/me");
-            return _cachedCurrentUser;
+            var user = await _httpClient.GetFromJsonAsync<UserDto>("/api/me");
+            lock (_lockObject)
+            {
+                _cachedCurrentUser = user;
+            }
+            return user;
         }
         catch (HttpRequestException)
         {
@@ -38,13 +46,20 @@ public class UserContextService : IUserContextService
     /// <inheritdoc />
     public async Task<List<GroupDto>> GetUserGroupsAsync()
     {
-        if (_cachedUserGroups != null)
-            return _cachedUserGroups;
+        lock (_lockObject)
+        {
+            if (_cachedUserGroups != null)
+                return _cachedUserGroups;
+        }
 
         try
         {
-            _cachedUserGroups = await _httpClient.GetFromJsonAsync<List<GroupDto>>("/api/users/me/groups") ?? new List<GroupDto>();
-            return _cachedUserGroups;
+            var groups = await _httpClient.GetFromJsonAsync<List<GroupDto>>("/api/users/me/groups") ?? new List<GroupDto>();
+            lock (_lockObject)
+            {
+                _cachedUserGroups = groups;
+            }
+            return groups;
         }
         catch (HttpRequestException)
         {
@@ -55,13 +70,19 @@ public class UserContextService : IUserContextService
     /// <inheritdoc />
     public void SetSessionGroupId(Guid? groupId)
     {
-        _sessionGroupId = groupId;
+        lock (_lockObject)
+        {
+            _sessionGroupId = groupId;
+        }
     }
 
     /// <inheritdoc />
     public Guid? GetSessionGroupId()
     {
-        return _sessionGroupId;
+        lock (_lockObject)
+        {
+            return _sessionGroupId;
+        }
     }
 
     /// <inheritdoc />
@@ -96,8 +117,11 @@ public class UserContextService : IUserContextService
     /// </summary>
     public void ClearCache()
     {
-        _cachedCurrentUser = null;
-        _cachedUserGroups = null;
-        _sessionGroupId = null;
+        lock (_lockObject)
+        {
+            _cachedCurrentUser = null;
+            _cachedUserGroups = null;
+            _sessionGroupId = null;
+        }
     }
 }

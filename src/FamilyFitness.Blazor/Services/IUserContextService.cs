@@ -36,4 +36,9 @@ public interface IUserContextService
     /// Gets members of the specified group (if user has access)
     /// </summary>
     Task<List<UserDto>> GetGroupMembersAsync(Guid groupId);
+    
+    /// <summary>
+    /// Clears cached data - useful when user context changes
+    /// </summary>
+    void ClearCache();
 }
