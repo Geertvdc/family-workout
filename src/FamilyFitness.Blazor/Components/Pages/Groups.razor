@@ -30,50 +30,7 @@
         </div>
     }
 
-    <!-- Mobile collapsible create form, always visible on desktop -->
-    <div class="@(showCreateForm ? "d-block" : "d-none d-md-block") mb-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">Create New Group</h5>
-            </div>
-            <div class="card-body">
-                <EditForm Model="@newGroup" OnValidSubmit="@CreateGroup">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">Name *</label>
-                                <InputText class="form-control" @bind-Value="newGroup.Name" placeholder="My Family Fitness Group" required />
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">Description</label>
-                                <InputText class="form-control" @bind-Value="newGroup.Description" placeholder="Optional description" />
-                            </div>
-                        </div>
-                    </div>
-                    <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary" disabled="@isCreating">
-                            @if (isCreating)
-                            {
-                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
-                                <span>Creating...</span>
-                            }
-                            else
-                            {
-                                <i class="bi bi-plus-circle me-1"></i>
-                                <span>Create Group</span>
-                            }
-                        </button>
-                        <button type="button" class="btn btn-outline-secondary d-md-none" @onclick="ToggleCreateForm">
-                            Cancel
-                        </button>
-                    </div>
-                </EditForm>
-            </div>
-        </div>
-    </div>
-
+    <!-- Groups List Section -->
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h4 class="mb-0">Your Groups</h4>
         @if (groups != null && groups.Any())
@@ -95,17 +52,19 @@
     }
     else if (!groups.Any())
     {
-        <div class="text-center py-5">
-            <div class="mb-3">
-                <i class="bi bi-people display-1 text-muted"></i>
+        <div class="card mb-4">
+            <div class="card-body text-center py-5">
+                <div class="mb-3">
+                    <i class="bi bi-people display-1 text-muted"></i>
+                </div>
+                <h5 class="text-white mb-3">No groups yet</h5>
+                <p class="text-muted">Create your first group below or use an invite link from friends to join an existing group!</p>
             </div>
-            <h5 class="text-muted mb-3">No groups yet</h5>
-            <p class="text-muted">Create your first group above or use an invite link to join an existing one!</p>
         </div>
     }
     else
     {
-        <div class="row g-3">
+        <div class="row g-3 mb-4">
             @foreach (var group in groups)
             {
                 <div class="col-12 col-sm-6 col-lg-4">
@@ -187,9 +146,71 @@
             }
         </div>
     }
+
+    <!-- Join Existing Group Section -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0">Join Existing Group</h5>
+        </div>
+        <div class="card-body">
+            <p class="text-muted mb-3">
+                Already have an invite link from a friend or family member? Use the link they shared with you to join their fitness group instantly.
+            </p>
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle me-2"></i>
+                <strong>How to join:</strong> Click on the invite link that was shared with you via email, text, or social media. You'll be automatically added to the group!
+            </div>
+        </div>
+    </div>
+
+    <!-- Create New Group Section -->
+    <div class="@(showCreateForm ? "d-block" : "d-none d-md-block")">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Create New Group</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">
+                    Create a new fitness group for your family or friends. As the group owner, you'll be able to create workouts, invite members, and track everyone's progress.
+                </p>
+                <EditForm Model="@newGroup" OnValidSubmit="@CreateGroup">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Name *</label>
+                                <InputText class="form-control" @bind-Value="newGroup.Name" placeholder="My Family Fitness Group" required />
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Description</label>
+                                <InputText class="form-control" @bind-Value="newGroup.Description" placeholder="Optional description" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary" disabled="@isCreating">
+                            @if (isCreating)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                <span>Creating...</span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-plus-circle me-1"></i>
+                                <span>Create Group</span>
+                            }
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary d-md-none" @onclick="ToggleCreateForm">
+                            Cancel
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
 </div>
 
-<!-- Toast notifications -->
 @if (copiedMessage != null)
 {
     <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1055">

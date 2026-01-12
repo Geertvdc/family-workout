@@ -461,7 +461,7 @@ app.MapDelete("/api/users/{id:guid}", async (Guid id, UserService service) =>
 
 // Group endpoints
 
-// Helper function to get current user ID from claims
+// Helper function to get current user ID from claims with auto-provisioning
 async Task<Guid?> GetCurrentUserIdAsync(ClaimsPrincipal user, UserService userService)
 {
     // Priority 1: Look up by EntraObjectId (most reliable)
@@ -500,7 +500,91 @@ async Task<Guid?> GetCurrentUserIdAsync(ClaimsPrincipal user, UserService userSe
     
     var users = await userService.GetAllAsync();
     var currentUser = users.FirstOrDefault(u => u.Email.Equals(emailClaim, StringComparison.OrdinalIgnoreCase));
-    return currentUser?.Id;
+    
+    // If user exists, return their ID
+    if (currentUser != null)
+    {
+        return currentUser.Id;
+    }
+    
+    // User doesn't exist - auto-provision them (similar to /api/me endpoint logic)
+    try
+    {
+        // Get display name from various claims
+        var givenName = user.FindFirst("givenname")?.Value 
+            ?? user.FindFirst("given_name")?.Value 
+            ?? user.FindFirst(ClaimTypes.GivenName)?.Value;
+        var familyName = user.FindFirst("surname")?.Value 
+            ?? user.FindFirst("family_name")?.Value 
+            ?? user.FindFirst(ClaimTypes.Surname)?.Value;
+        
+        // Construct full name from given + family name
+        string? nameClaim = null;
+        if (!string.IsNullOrWhiteSpace(givenName))
+        {
+            nameClaim = string.IsNullOrWhiteSpace(familyName) 
+                ? givenName 
+                : $"{givenName} {familyName}";
+        }
+        
+        // If still no name, try the "name" claim (but skip if it's "unknown" or looks like email)
+        if (string.IsNullOrWhiteSpace(nameClaim))
+        {
+            var rawName = user.FindFirst("name")?.Value ?? user.FindFirst(ClaimTypes.Name)?.Value;
+            if (!string.IsNullOrWhiteSpace(rawName) && 
+                !rawName.Equals("unknown", StringComparison.OrdinalIgnoreCase) &&
+                !rawName.Contains("@") && 
+                !rawName.Contains(".onmicrosoft.com"))
+            {
+                nameClaim = rawName;
+            }
+        }
+        
+        // Fallback: use the local part of email as name
+        if (string.IsNullOrWhiteSpace(nameClaim) || nameClaim.Equals("unknown", StringComparison.OrdinalIgnoreCase))
+        {
+            nameClaim = emailClaim.Split('@')[0];
+            if (nameClaim.Length > 0)
+            {
+                nameClaim = char.ToUpper(nameClaim[0]) + nameClaim.Substring(1);
+            }
+        }
+        
+        if (string.IsNullOrWhiteSpace(nameClaim))
+        {
+            nameClaim = "Unknown";
+        }
+        
+        // Generate username from name (remove spaces, lowercase, alphanumeric only)
+        var username = nameClaim.Replace(" ", "").ToLowerInvariant();
+        username = new string(username.Where(c => char.IsLetterOrDigit(c)).ToArray());
+        
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            username = "user";
+        }
+        
+        // Handle potential username conflicts by adding numbers
+        var baseUsername = username;
+        var counter = 1;
+        var allUsers = await userService.GetAllAsync();
+        
+        while (allUsers.Any(u => u.Username.Equals(username, StringComparison.OrdinalIgnoreCase)))
+        {
+            username = $"{baseUsername}{counter}";
+            counter++;
+        }
+
+        var createCommand = new CreateUserCommand(entraObjectId, username, emailClaim);
+        var newUser = await userService.CreateAsync(createCommand);
+        
+        return newUser.Id;
+    }
+    catch (Exception)
+    {
+        // If user creation fails, return null to maintain existing behavior
+        return null;
+    }
 }
 
 // Get current user's groups only (scoped)
