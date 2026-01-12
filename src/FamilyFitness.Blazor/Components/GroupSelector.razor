@@ -3,7 +3,12 @@
 @inject IUserContextService UserContext
 
 <div class="group-selector mb-3">
-    <label for="group-select" class="form-label">Select Group:</label>
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <label for="group-select" class="form-label mb-0">Select Group:</label>
+        <a href="/groups" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-plus-circle me-1"></i><span class="d-none d-sm-inline">Create New</span><span class="d-inline d-sm-none">+</span>
+        </a>
+    </div>
     @if (groups.Any())
     {
         <select id="group-select" class="form-select" @onchange="HandleGroupChange" value="@SelectedGroupId">
@@ -19,7 +24,7 @@
     else
     {
         <div class="alert alert-info">
-            <i class="fas fa-info-circle me-2"></i>
+            <i class="bi bi-info-circle me-2"></i>
             You are not a member of any groups yet. 
             <a href="/groups" class="alert-link">Create or join a group</a> to get started.
         </div>
@@ -50,6 +55,20 @@
             {
                 var members = await UserContext.GetGroupMembersAsync(group.Id);
                 memberCounts[group.Id] = members.Count;
+            }
+            
+            // Auto-select the first group if no group is currently selected and groups exist
+            if (!SelectedGroupId.HasValue && groups.Any())
+            {
+                var firstGroup = groups.First();
+                SelectedGroupId = firstGroup.Id;
+                UserContext.SetSessionGroupId(firstGroup.Id);
+                
+                // Notify parent components of the selection
+                await SelectedGroupIdChanged.InvokeAsync(firstGroup.Id);
+                await OnGroupSelected.InvokeAsync(firstGroup);
+                
+                StateHasChanged();
             }
         }
         catch (Exception ex)
