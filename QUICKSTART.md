@@ -165,12 +165,12 @@ dotnet build
 
 ## Troubleshooting
 
-### Cosmos DB Connection Issues
+### PostgreSQL Connection Issues
 
 If you see connection errors:
-1. Verify the Cosmos DB emulator is running
+1. Verify PostgreSQL is running (Docker/Aspire or local install)
 2. Check the connection string in `src/FamilyFitness.Api/appsettings.Development.json`
-3. Make sure the database and container exist
+3. Make sure the database exists and migrations/schema are applied
 
 ### HTTPS Certificate Issues
 

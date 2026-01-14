@@ -125,25 +125,20 @@ public class GuidIdGenerator : IIdGenerator
 }
 ```
 
-**`WorkoutTypeDocument`** - Cosmos DB representation:
+**`WorkoutTypeEntity`** - EF Core entity (PostgreSQL table representation):
 ```csharp
-public class WorkoutTypeDocument
+public class WorkoutTypeEntity
 {
-    public string id { get; set; } = string.Empty;  // lowercase for Cosmos convention
+    public string Id { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
-    public int? EstimatedDurationMinutes { get; set; }
-    public string Intensity { get; set; } = string.Empty;
-    public string PartitionKey { get; set; } = "WorkoutTypes";
 }
 ```
 
-**`CosmosWorkoutTypeRepository : IWorkoutTypeRepository`**
-- Uses Cosmos DB SDK
-- Database: `family-fitness`
-- Container: `workout-types`
-- Partition Key: `"WorkoutTypes"` (constant for all items)
-- Maps between `WorkoutType` (domain) and `WorkoutTypeDocument` (Cosmos)
+**`PostgresWorkoutTypeRepository : IWorkoutTypeRepository`**
+- Uses EF Core via `FamilyFitnessDbContext`
+- Maps between `WorkoutType` (domain) and `WorkoutTypeEntity` (database)
+- Persists to PostgreSQL
 
 ### API Layer
 
@@ -238,8 +233,8 @@ public class FixedIdGenerator : IIdGenerator
 
 4. **Infrastructure Layer**
    - Implement GuidIdGenerator
-   - Implement WorkoutTypeDocument
-   - Implement CosmosWorkoutTypeRepository
+   - Implement EF Core entity mapping (if needed)
+   - Implement PostgresWorkoutTypeRepository
 
 5. **API Layer**
    - Implement minimal API endpoints
@@ -254,7 +249,7 @@ public class FixedIdGenerator : IIdGenerator
    - Add HttpClient configuration
 
 7. **Aspire Configuration**
-   - Configure Cosmos DB resource
+   - Configure PostgreSQL resource
    - Wire API and Blazor projects
    - Set connection strings
 
@@ -270,7 +265,7 @@ public class FixedIdGenerator : IIdGenerator
 - [ ] Can run application via Aspire
 - [ ] API endpoints are accessible and functional
 - [ ] Blazor page displays, creates, and deletes workout types
-- [ ] Data persists in Cosmos DB emulator
+- [ ] Data persists in PostgreSQL
 - [ ] Duplicate name validation works (case-insensitive)
 - [ ] Appropriate HTTP status codes returned
 - [ ] Clean Architecture boundaries respected
