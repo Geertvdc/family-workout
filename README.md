@@ -149,7 +149,6 @@ The API runs on `https://localhost:7001` (or configured port) and provides compl
 - **Interval Scores** - `/api/workout-interval-scores` - Performance scores (3 rounds × 4 stations)
 
 ### API Features
-- Full CRUD operations (Create, Read, Update, Delete)
 - Nested endpoints for related data (e.g., `/api/groups/{id}/memberships`)
 - Consistent error handling with descriptive messages
 - Input validation at service layer
