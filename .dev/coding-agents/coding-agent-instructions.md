@@ -128,25 +128,26 @@ public class WorkoutTypeService
 
 ### Infrastructure Layer
 ```csharp
-// Document models represent Cosmos DB structure
-public class WorkoutTypeDocument
+// EF Core entities represent PostgreSQL tables
+public class WorkoutTypeEntity
 {
-    public string id { get; set; } = string.Empty;  // lowercase for Cosmos
+    public string Id { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
-    public int? EstimatedDurationMinutes { get; set; }
-    public string Intensity { get; set; } = string.Empty;
-    public string PartitionKey { get; set; } = "WorkoutTypes";
 }
 
-// Repository implementations handle data mapping
-public class CosmosWorkoutTypeRepository : IWorkoutTypeRepository
+// Repository implementations map between EF entities and domain entities
+public class PostgresWorkoutTypeRepository : IWorkoutTypeRepository
 {
-    private readonly Container _container;
-    
-    // Map between Document and Domain entity
-    private static WorkoutType ToEntity(WorkoutTypeDocument doc) { /*...*/ }
-    private static WorkoutTypeDocument ToDocument(WorkoutType entity) { /*...*/ }
+    private readonly FamilyFitnessDbContext _context;
+
+    public PostgresWorkoutTypeRepository(FamilyFitnessDbContext context)
+    {
+        _context = context;
+    }
+
+    private static WorkoutType ToEntity(WorkoutTypeEntity dbEntity) { /*...*/ }
+    private static WorkoutTypeEntity ToDbEntity(WorkoutType entity) { /*...*/ }
 }
 ```
 
@@ -293,31 +294,15 @@ public class FixedIdGenerator : IIdGenerator
 }
 ```
 
-## Cosmos DB Guidelines
+## PostgreSQL / EF Core Guidelines
 
 ### Database Configuration
-- Database: `family-fitness`
-- Containers use partition keys appropriate to their access patterns
-- For MVP, use simple partition keys (e.g., constant value `"WorkoutTypes"`)
-- Document `id` field should be lowercase (Cosmos convention)
-
-### Container Setup
-```csharp
-// In repository or startup
-var database = client.GetDatabase("family-fitness");
-var container = database.GetContainer("workout-types");
-```
+- PostgreSQL is the primary database for this repo.
+- Schema is managed via EF Core migrations in `src/FamilyFitness.Infrastructure/Migrations/`.
 
 ### Querying
-```csharp
-// Use LINQ when possible
-var query = _container.GetItemLinqQueryable<WorkoutTypeDocument>()
-    .Where(d => d.PartitionKey == "WorkoutTypes");
-
-// For single item reads, use ReadItemAsync for efficiency
-var response = await _container.ReadItemAsync<WorkoutTypeDocument>(
-    id, new PartitionKey("WorkoutTypes"));
-```
+- Prefer EF Core queries via `FamilyFitnessDbContext`.
+- Keep EF Core types inside Infrastructure; map to Domain entities in repositories.
 
 ## Aspire Configuration
 
@@ -325,17 +310,22 @@ var response = await _container.ReadItemAsync<WorkoutTypeDocument>(
 ```csharp
 var builder = DistributedApplication.CreateBuilder(args);
 
-// Add Cosmos DB
-var cosmos = builder.AddAzureCosmosDB("cosmos")
-    .RunAsEmulator();
+// Add PostgreSQL database
+var postgresServer = builder.AddPostgres("postgres")
+    .WithLifetime(ContainerLifetime.Persistent);
 
-// Add API with Cosmos reference
-var api = builder.AddProject<Projects.FamilyFitness_Api>("api")
-    .WithReference(cosmos);
+var postgresDb = postgresServer.AddDatabase("family-fitness");
 
-// Add Blazor with API reference
-builder.AddProject<Projects.FamilyFitness_Blazor>("blazor")
-    .WithReference(api);
+// Add the API project with PostgreSQL reference
+var api = builder.AddProject("api", "../../src/FamilyFitness.Api/FamilyFitness.Api.csproj")
+    .WithReference(postgresDb)
+    .WaitFor(postgresDb);
+
+// Add the Blazor project with API reference
+builder.AddProject("blazor", "../../src/FamilyFitness.Blazor/FamilyFitness.Blazor.csproj")
+    .WithEnvironment("ApiUrl", api.GetEndpoint("https"));
+
+builder.Build().Run();
 ```
 
 ## Common Pitfalls to Avoid
@@ -377,5 +367,5 @@ builder.AddProject<Projects.FamilyFitness_Blazor>("blazor")
 
 - [Clean Architecture by Robert C. Martin](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html)
 - [.NET Minimal APIs](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/minimal-apis)
-- [Azure Cosmos DB .NET SDK](https://learn.microsoft.com/en-us/azure/cosmos-db/nosql/sdk-dotnet-v3)
+- [EF Core](https://learn.microsoft.com/en-us/ef/core/)
 - [.NET Aspire](https://learn.microsoft.com/en-us/dotnet/aspire/)

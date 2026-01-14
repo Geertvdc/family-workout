@@ -7,7 +7,8 @@
 - **Architecture Pattern**: Clean Architecture
 - **Development Approach**: Test-Driven Development (TDD)
 - **API Style**: REST
-- **Database**: Azure Cosmos DB
+- **Authentication**: OpenID Connect (OIDC) via Azure Entra External ID
+- **Database**: PostgreSQL (EF Core)
 - **Local Development**: .NET Aspire
 - **Design Principle**: Keep it simple - don't add anything we don't need
 
@@ -46,15 +47,16 @@
 **Responsibility**: External concerns and technical implementations
 
 - Implements repository interfaces defined in Application layer
-- Database access (Cosmos DB)
+- Database access (PostgreSQL via EF Core)
 - External services
 - File system access
 - Depends on Application and Domain layers
 
 **Key Components**:
-- `CosmosWorkoutTypeRepository`: Cosmos DB implementation of `IWorkoutTypeRepository`
+- `FamilyFitnessDbContext`: EF Core DbContext
+- `Postgres*Repository` classes: PostgreSQL implementations of repository interfaces
 - `GuidIdGenerator`: GUID-based implementation of `IIdGenerator`
-- Document models for database (e.g., `WorkoutTypeDocument`)
+- EF Core migrations in `src/FamilyFitness.Infrastructure/Migrations/`
 
 ### 4. API Layer (`FamilyFitness.Api`)
 **Responsibility**: RESTful HTTP endpoints
@@ -94,7 +96,7 @@ DELETE /api/{resource}/{id} - Delete
 **Responsibility**: Local development orchestration
 
 - Configures and orchestrates all services for local development
-- Provisions Cosmos DB emulator
+- Provisions PostgreSQL container (via Aspire)
 - Manages service-to-service communication
 - Provides connection strings and configuration
 
@@ -113,24 +115,18 @@ Domain Layer (Entities with Business Rules)
     ↓
 Application Layer (Repository Interface)
     ↓
-Infrastructure Layer (Cosmos Repository Implementation)
+Infrastructure Layer (EF Core repository implementation)
     ↓
-Cosmos DB
+PostgreSQL
 ```
 
-## Cosmos DB Design
+## PostgreSQL Design
 
-### Database Structure
-- **Database Name**: `family-fitness`
-- **Containers**:
-  - `workout-types`: Stores workout type definitions
-    - Partition Key: `"WorkoutTypes"` (simple partition strategy for MVP)
+### EF Core Mapping
+Infrastructure uses EF Core entities and `FamilyFitnessDbContext` to map the domain model to PostgreSQL tables.
 
-### Document Pattern
-Infrastructure layer uses Document models (e.g., `WorkoutTypeDocument`) that:
-- Represent the JSON structure stored in Cosmos
-- Include Cosmos-specific metadata (`id`, partition key)
-- Map to/from Domain entities
+- Schema changes are managed via EF Core migrations in `src/FamilyFitness.Infrastructure/Migrations/`.
+- Local development uses Aspire to provide a PostgreSQL instance and connection string wiring.
 
 ## Testing Strategy
 
@@ -142,7 +138,7 @@ Infrastructure layer uses Document models (e.g., `WorkoutTypeDocument`) that:
 
 ### Integration Tests (`FamilyFitness.IntegrationTests`)
 - Test API endpoints with real infrastructure
-- May use Cosmos DB emulator
+- Uses PostgreSQL (Docker/CI)
 - Test full request/response cycles
 
 ### End-to-End Tests (`FamilyFitness.EndToEndTests`)
@@ -153,7 +149,7 @@ Infrastructure layer uses Document models (e.g., `WorkoutTypeDocument`) that:
 ## Key Design Decisions
 
 1. **Immutable Entities**: Domain entities use `With*` methods for updates instead of property setters
-2. **Simple Partition Key**: Using a constant partition key (`"WorkoutTypes"`) for MVP - optimize later if needed
+2. **EF Core Migrations**: Schema evolves via migrations (no manual SQL by default)
 3. **Minimal APIs**: Using .NET minimal APIs for simplicity
 4. **TDD Approach**: Write tests first, then implementation
 5. **No Over-Engineering**: Start simple, add complexity only when needed
@@ -164,14 +160,14 @@ Infrastructure layer uses Document models (e.g., `WorkoutTypeDocument`) that:
 - Application layer depends only on **Domain**
 - Infrastructure layer depends on **Application** and **Domain**
 - API layer depends on **Application** and **Infrastructure**
-- Blazor layer depends on **nothing** (calls API via HTTP)
+- Blazor layer must not depend on **Infrastructure** (it may share DTOs via Application for now)
 - Tests can depend on layers they test
 
 ## Future Considerations
 
-- Optimize Cosmos partition keys when data grows
+- Revisit performance/indices as data grows
 - Add caching layer if needed
-- Add authentication/authorization
+- Evolve authorization rules/roles (auth is already in place via Azure Entra External ID)
 - Add logging and monitoring
 - Add more sophisticated error handling
 - Consider CQRS pattern for complex queries
