@@ -29,14 +29,14 @@
         <div class="completion-screen">
             <h1>🔥 WORKOUT COMPLETE! 🔥</h1>
             <p class="completion-subtitle">GREAT JOB!</p>
-            <button class="btn btn-primary btn-lg" @onclick="GoHome">Back to Home</button>
+            <button class="btn btn-primary btn-lg" @onclick="GoHome">Back to Dashboard</button>
         </div>
     }
     else if (session.Status == WorkoutSessionStatus.Cancelled)
     {
         <div class="completion-screen">
             <h1>WORKOUT CANCELLED</h1>
-            <button class="btn btn-primary btn-lg" @onclick="GoHome">Back to Home</button>
+            <button class="btn btn-primary btn-lg" @onclick="GoHome">Back to Dashboard</button>
         </div>
     }
     else

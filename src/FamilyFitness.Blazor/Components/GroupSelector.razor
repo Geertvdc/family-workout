@@ -57,19 +57,9 @@
                 memberCounts[group.Id] = members.Count;
             }
             
-            // Auto-select the first group if no group is currently selected and groups exist
-            if (!SelectedGroupId.HasValue && groups.Any())
-            {
-                var firstGroup = groups.First();
-                SelectedGroupId = firstGroup.Id;
-                UserContext.SetSessionGroupId(firstGroup.Id);
-                
-                // Notify parent components of the selection
-                await SelectedGroupIdChanged.InvokeAsync(firstGroup.Id);
-                await OnGroupSelected.InvokeAsync(firstGroup);
-                
-                StateHasChanged();
-            }
+            // Note: do not auto-select a group.
+            // Some flows (like creating a new workout) require explicit selection.
+            // We keep the session group behavior in HandleGroupChange.
         }
         catch (Exception ex)
         {

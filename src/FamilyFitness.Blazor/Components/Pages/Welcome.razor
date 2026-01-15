@@ -1,81 +1,176 @@
 @page "/"
 @using Microsoft.AspNetCore.Components.Authorization
+@using System.Net.Http.Json
 @using FamilyFitness.Application
+@using FamilyFitness.Domain
+@using FamilyFitness.Blazor.Models
 @using FamilyFitness.Blazor.Services
 @inject AuthenticationStateProvider AuthenticationStateProvider
-@inject NavigationManager Navigation
+@inject HttpClient Http
 @inject IUserContextService UserContext
 @rendermode InteractiveServer
 
 <PageTitle>FFWOD - Family Fitness Workout of the Day</PageTitle>
 
-<div class="welcome-container">
-    <div class="hero-section">
-        <h1 class="display-1">FFWOD</h1>
-        <p class="lead">Family Fitness Workout of the Day</p>
-        <p class="fs-5">Get fit together as a family with daily workouts, progress tracking, and friendly competition!</p>
-    </div>
-
-    <AuthorizeView>
-        <Authorized>
-            @if (loadingUserGroups)
+<AuthorizeView>
+    <Authorized>
+        <div class="container-fluid px-3">
+            @if (isLoading)
             {
-                <div class="text-center">
-                    <div class="spinner-border" role="status">
-                        <span class="visually-hidden">Loading...</span>
+                <div class="d-flex justify-content-center py-5">
+                    <div class="text-center">
+                        <div class="spinner-border text-primary mb-3" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="text-muted">Loading your dashboard...</p>
                     </div>
-                    <p class="mt-2">Setting up your workspace...</p>
                 </div>
             }
-            else if (userGroups?.Any() == true)
+            else if (hasGroups == false)
             {
-                <!-- User has groups - show dashboard option -->
-                <div class="card">
-                    <div class="card-body text-center">
-                        <h3>Welcome back!</h3>
-                        <p>Ready to continue your fitness journey?</p>
-                        <a href="/home" class="btn btn-primary btn-lg">Go to Dashboard</a>
+                <div class="welcome-container">
+                    <div class="hero-section">
+                        <h1 class="display-1">FFWOD</h1>
+                        <p class="lead">Family Fitness Workout of the Day</p>
+                        <p class="fs-5">Create a group first, then start tracking workouts.</p>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <h3>Welcome to FFWOD!</h3>
+                            <p class="text-muted mb-4">Let's get you started with your first workout group.</p>
+                            <a href="/groups" class="btn btn-primary btn-lg">Create or Join a Group</a>
+                        </div>
                     </div>
                 </div>
             }
             else
             {
-                <!-- User has no groups - show onboarding -->
+                <div class="d-flex justify-content-between align-items-start mb-4">
+                    <div>
+                        <h2 class="mb-1">Dashboard</h2>
+                        @if (currentUser != null)
+                        {
+                            <div class="text-muted">Hi @currentUser.Username</div>
+                        }
+                    </div>
+                    <div class="d-flex gap-2">
+                        <a href="/profile" class="btn btn-outline-secondary">
+                            <i class="bi bi-person-circle me-1"></i>
+                            Profile
+                        </a>
+                        <a href="/setup-wod" class="btn btn-primary">
+                            <i class="bi bi-plus-circle me-1"></i>
+                            New Workout
+                        </a>
+                    </div>
+                </div>
+
                 <div class="card">
-                    <div class="card-body text-center">
-                        <h3>Welcome to FFWOD! 🎉</h3>
-                        <p class="text-muted mb-4">Let's get you started with your first workout group.</p>
-                        
-                        <div class="get-started-steps">
-                            <div class="step">
-                                <div class="step-number">1</div>
-                                <h6>Create Your Group</h6>
-                                <p class="small">Set up a workout group for your family or friends</p>
-                            </div>
-                            
-                            <div class="step">
-                                <div class="step-number">2</div>
-                                <h6>Invite Members</h6>
-                                <p class="small">Share an invite link to add people to your group</p>
-                            </div>
-                            
-                            <div class="step">
-                                <div class="step-number">3</div>
-                                <h6>Start Working Out</h6>
-                                <p class="small">Create and run workouts together!</p>
-                            </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Recent Workouts</h5>
+                            <a href="/groups" class="btn btn-sm btn-outline-primary">Groups</a>
                         </div>
-                        
-                        <div class="welcome-actions mt-4">
-                            <a href="/groups" class="btn btn-primary btn-lg">
-                                🏃‍♀️ Create or Join a Group
+                        <div class="text-muted small mt-1">Completed and cancelled sessions across all groups.</div>
+                    </div>
+                </div>
+
+                @if (feedError != null)
+                {
+                    <div class="alert alert-danger mt-3">@feedError</div>
+                }
+                else if (recentSessions.Count == 0)
+                {
+                    <div class="card mt-3">
+                        <div class="card-body text-center py-5">
+                            <div class="mb-3">
+                                <i class="bi bi-calendar-x display-1 text-muted"></i>
+                            </div>
+                            <h5 class="text-muted mb-3">No past workouts yet</h5>
+                            <p class="text-muted mb-4">Start your first workout and it will show up here.</p>
+                            <a href="/setup-wod" class="btn btn-primary">
+                                <i class="bi bi-plus-circle me-1"></i>
+                                Start a Workout
                             </a>
                         </div>
                     </div>
-                </div>
+                }
+                else
+                {
+                    <div class="mt-3">
+                        @foreach (var item in recentSessions)
+                        {
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <div class="fw-bold">@item.GroupName</div>
+                                            <div class="text-muted small">
+                                                @item.SessionDate.ToString("dddd, MMMM dd, yyyy")
+                                                @if (item.DurationText != null)
+                                                {
+                                                    <span class="mx-2">•</span>
+                                                    <span>@item.DurationText</span>
+                                                }
+                                            </div>
+
+                                            @if (item.IsLoadingDetails)
+                                            {
+                                                <div class="text-muted small mt-2">
+                                                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                                    Loading workout details...
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                @if (item.StationNames.Count > 0)
+                                                {
+                                                    <div class="small mt-2">
+                                                        <div class="fw-semibold text-muted small mb-1">Workout</div>
+                                                        <i class="bi bi-grid-3x3-gap me-1"></i>
+                                                        @string.Join(" • ", item.StationNames)
+                                                    </div>
+                                                }
+                                                @if (item.ParticipantNames.Count > 0)
+                                                {
+                                                    <div class="text-muted small mt-1">
+                                                        <div class="fw-semibold text-muted small mb-1">Participants</div>
+                                                        <i class="bi bi-people me-1"></i>
+                                                        @string.Join(", ", item.ParticipantNames)
+                                                    </div>
+                                                }
+                                                else if (item.ParticipantCount.HasValue)
+                                                {
+                                                    <div class="text-muted small mt-1">
+                                                        <div class="fw-semibold text-muted small mb-1">Participants</div>
+                                                        <i class="bi bi-people me-1"></i>
+                                                        @item.ParticipantCount participant@(item.ParticipantCount == 1 ? "" : "s")
+                                                    </div>
+                                                }
+                                            }
+                                        </div>
+                                        <span class="badge @GetStatusBadgeClass(item.Status)">@GetStatusText(item.Status)</span>
+                                    </div>
+
+
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
             }
-        </Authorized>
-        <NotAuthorized>
+        </div>
+    </Authorized>
+
+    <NotAuthorized>
+        <div class="welcome-container">
+            <div class="hero-section">
+                <h1 class="display-1">FFWOD</h1>
+                <p class="lead">Family Fitness Workout of the Day</p>
+                <p class="fs-5">Get fit together as a family with daily workouts, progress tracking, and friendly competition!</p>
+            </div>
+
             <div class="info-section mt-4">
                 <div class="alert alert-info">
                     <h5>👋 First time here?</h5>
@@ -124,36 +219,177 @@
                     </div>
                 </div>
             </div>
-        </NotAuthorized>
-    </AuthorizeView>
-</div>
+        </div>
+    </NotAuthorized>
+</AuthorizeView>
 
 @code {
-    private bool loadingUserGroups = true;
-    private List<GroupDto>? userGroups;
+    private bool isLoading = true;
+    private bool? hasGroups;
+    private FamilyFitness.Application.UserDto? currentUser;
+    private string? feedError;
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    private readonly List<FeedItem> recentSessions = new();
+
+    protected override async Task OnInitializedAsync()
     {
-        if (firstRender)
+        try
         {
-            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-            if (authState.User.Identity?.IsAuthenticated == true)
+            currentUser = await UserContext.GetCurrentUserAsync();
+
+            var groups = await UserContext.GetUserGroupsAsync();
+            hasGroups = groups.Any();
+
+            if (hasGroups.Value)
             {
-                // Load user groups to determine the appropriate experience
-                try
-                {
-                    userGroups = await UserContext.GetUserGroupsAsync();
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error loading user groups: {ex.Message}");
-                    userGroups = new List<GroupDto>();
-                }
-                
-                loadingUserGroups = false;
-                StateHasChanged();
+                await LoadRecentSessionsAsync(groups);
             }
         }
+        catch (Exception ex)
+        {
+            feedError = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadRecentSessionsAsync(List<FamilyFitness.Application.GroupDto> groups)
+    {
+        try
+        {
+            var allSessions = new List<FeedItem>();
+
+            foreach (var group in groups)
+            {
+                var sessions = await Http.GetFromJsonAsync<List<FamilyFitness.Application.WorkoutSessionDto>>($"/api/groups/{group.Id}/workout-sessions")
+                    ?? new List<FamilyFitness.Application.WorkoutSessionDto>();
+
+                foreach (var session in sessions)
+                {
+                    if (session.Status is FamilyFitness.Domain.WorkoutSessionStatus.Completed or FamilyFitness.Domain.WorkoutSessionStatus.Cancelled)
+                    {
+                        allSessions.Add(new FeedItem
+                        {
+                            Id = session.Id,
+                            GroupId = group.Id,
+                            GroupName = group.Name,
+                            SessionDate = session.SessionDate,
+                            Status = session.Status,
+                            DurationText = FormatDuration(session.StartedAt, session.EndedAt),
+                            IsLoadingDetails = true
+                        });
+                    }
+                }
+            }
+
+            recentSessions.Clear();
+            recentSessions.AddRange(
+                allSessions
+                    .OrderByDescending(s => s.SessionDate)
+                    .Take(15));
+
+            // Fetch workout details for the top items (stations + participants)
+            foreach (var item in recentSessions)
+            {
+                _ = LoadSessionDetailsAsync(item);
+            }
+        }
+        catch (Exception ex)
+        {
+            feedError = $"Failed to load recent workouts: {ex.Message}";
+        }
+    }
+
+    private async Task LoadSessionDetailsAsync(FeedItem item)
+    {
+        try
+        {
+            var assignments = await Http.GetFromJsonAsync<FamilyFitness.Application.SessionAssignmentDto>($"/api/workout-sessions/{item.Id}/assignments");
+            if (assignments != null)
+            {
+                item.ParticipantCount = assignments.Participants?.Count;
+                item.ParticipantNames = assignments.Participants?
+                    .OrderBy(p => p.ParticipantIndex)
+                    .Select(p => p.UserName)
+                    .Where(n => !string.IsNullOrWhiteSpace(n))
+                    .ToList() ?? new List<string>();
+
+                item.StationNames = assignments.Stations?
+                    .OrderBy(s => s.StationIndex)
+                    .Select(s => s.WorkoutTypeName)
+                    .Where(n => !string.IsNullOrWhiteSpace(n))
+                    .Take(4)
+                    .ToList() ?? new List<string>();
+            }
+        }
+        catch
+        {
+            // ignore: details are optional
+        }
+        finally
+        {
+            item.IsLoadingDetails = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private static string? FormatDuration(DateTime? startedAt, DateTime? endedAt)
+    {
+        if (!startedAt.HasValue || !endedAt.HasValue)
+        {
+            return null;
+        }
+
+        var duration = endedAt.Value - startedAt.Value;
+        if (duration.TotalMinutes < 1)
+        {
+            return $"{Math.Max(0, (int)duration.TotalSeconds)}s";
+        }
+
+        if (duration.TotalHours < 1)
+        {
+            return $"{(int)duration.TotalMinutes}m";
+        }
+
+        return $"{(int)duration.TotalHours}h {(int)duration.Minutes}m";
+    }
+
+    private static string GetStatusBadgeClass(FamilyFitness.Domain.WorkoutSessionStatus status)
+    {
+        return status switch
+        {
+            FamilyFitness.Domain.WorkoutSessionStatus.Completed => "bg-primary",
+            FamilyFitness.Domain.WorkoutSessionStatus.Cancelled => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+
+    private static string GetStatusText(FamilyFitness.Domain.WorkoutSessionStatus status)
+    {
+        return status switch
+        {
+            FamilyFitness.Domain.WorkoutSessionStatus.Completed => "Completed",
+            FamilyFitness.Domain.WorkoutSessionStatus.Cancelled => "Cancelled",
+            _ => status.ToString()
+        };
+    }
+
+    private sealed class FeedItem
+    {
+        public Guid Id { get; init; }
+        public Guid GroupId { get; init; }
+        public string GroupName { get; init; } = string.Empty;
+        public DateTime SessionDate { get; init; }
+        public FamilyFitness.Domain.WorkoutSessionStatus Status { get; init; }
+
+        public string? DurationText { get; init; }
+
+        public bool IsLoadingDetails { get; set; }
+        public int? ParticipantCount { get; set; }
+        public List<string> ParticipantNames { get; set; } = new();
+        public List<string> StationNames { get; set; } = new();
     }
 }
 
