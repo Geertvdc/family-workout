@@ -84,6 +84,12 @@ public class WorkoutIntervalScoreService
         return scores.Select(ToDto).ToList();
     }
 
+    public async Task<IReadOnlyList<WorkoutIntervalScoreDto>> GetByWorkoutSessionIdAsync(Guid workoutSessionId)
+    {
+        var scores = await _repository.GetByWorkoutSessionIdAsync(workoutSessionId);
+        return scores.Select(ToDto).ToList();
+    }
+
     public async Task<WorkoutIntervalScoreDto> GetByIdAsync(Guid id)
     {
         var score = await _repository.GetByIdAsync(id);
