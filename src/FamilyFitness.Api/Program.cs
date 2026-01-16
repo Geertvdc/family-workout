@@ -1346,10 +1346,18 @@ app.MapDelete("/api/workout-session-participants/{id:guid}", async (Guid id, Wor
 .RequireAuthorization();
 
 // WorkoutIntervalScore endpoints
-app.MapGet("/api/workout-interval-scores", async (WorkoutIntervalScoreService service) =>
+app.MapGet("/api/workout-interval-scores", async (WorkoutIntervalScoreService service, Guid? workoutSessionId) =>
 {
-    var scores = await service.GetAllAsync();
-    return Results.Ok(scores);
+    if (workoutSessionId.HasValue)
+    {
+        var scores = await service.GetByWorkoutSessionIdAsync(workoutSessionId.Value);
+        return Results.Ok(scores);
+    }
+    else
+    {
+        var scores = await service.GetAllAsync();
+        return Results.Ok(scores);
+    }
 })
 .WithName("GetAllWorkoutIntervalScores")
 .RequireAuthorization();

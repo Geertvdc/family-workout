@@ -42,6 +42,16 @@ public class PostgresWorkoutIntervalScoreRepository : IWorkoutIntervalScoreRepos
             .ToListAsync();
     }
 
+    public async Task<IReadOnlyList<WorkoutIntervalScore>> GetByWorkoutSessionIdAsync(Guid workoutSessionId)
+    {
+        return await _context.WorkoutIntervalScores
+            .Where(s => s.Participant.WorkoutSessionId == workoutSessionId)
+            .OrderBy(s => s.Participant.ParticipantIndex)
+            .ThenBy(s => s.RoundNumber)
+            .ThenBy(s => s.StationIndex)
+            .ToListAsync();
+    }
+
     public async Task AddAsync(WorkoutIntervalScore score)
     {
         await _context.WorkoutIntervalScores.AddAsync(score);

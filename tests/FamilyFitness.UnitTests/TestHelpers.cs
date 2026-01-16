@@ -371,6 +371,14 @@ public class InMemoryWorkoutIntervalScoreRepository : IWorkoutIntervalScoreRepos
         return Task.FromResult<IReadOnlyList<WorkoutIntervalScore>>(scores);
     }
 
+    public Task<IReadOnlyList<WorkoutIntervalScore>> GetByWorkoutSessionIdAsync(Guid workoutSessionId)
+    {
+        // For testing purposes, we'll need to mock this since we don't have the full relationship
+        // In a real implementation, this would join with WorkoutSessionParticipant
+        var scores = new List<WorkoutIntervalScore>();
+        return Task.FromResult<IReadOnlyList<WorkoutIntervalScore>>(scores);
+    }
+
     public Task AddAsync(WorkoutIntervalScore score)
     {
         _scores.Add(score);
