@@ -16,13 +16,13 @@ main {
     width: 100%;
     max-width: 100%;
     margin: 0;
-    padding: 1rem 2rem;
+    padding: 0.5rem 1rem;
 }
 
 .admin-footer {
     background-color: #f8f9fa;
     border-top: 1px solid #dee2e6;
-    padding: 0.5rem 2rem;
+    padding: 0.25rem 1rem;
     text-align: right;
 }
 
@@ -33,17 +33,17 @@ main {
 }
 
 .admin-link:hover {
-    color: #495057;
+    color: #ff1744;
     text-decoration: underline;
 }
 
 @media (max-width: 640.98px) {
     .content {
-        padding: 1rem;
+        padding: 0.5rem;
     }
     
     .admin-footer {
-        padding: 0.5rem 1rem;
+        padding: 0.25rem 0.5rem;
     }
 }
 

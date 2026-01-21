@@ -21,14 +21,14 @@
 
 
 #components-reconnect-modal {
-    background-color: #1a1a1a;
-    color: white;
+    background-color: #ffffff;
+    color: #000000;
     width: 20rem;
     margin: 20vh auto;
-    padding: 2rem;
-    border: 2px solid #E63946;
+    padding: 1rem;
+    border: 2px solid #ff1744;
     border-radius: 0.5rem;
-    box-shadow: 0 3px 6px 2px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 3px 6px 2px rgba(0, 0, 0, 0.2);
     opacity: 0;
     transition: display 0.5s allow-discrete, overlay 0.5s allow-discrete;
     animation: components-reconnect-modal-fadeOutOpacity 0.5s both;
@@ -91,9 +91,9 @@
 
 #components-reconnect-modal button {
     border: 0;
-    background-color: #E63946;
+    background: linear-gradient(135deg, #ff1744, #e91e63);
     color: white;
-    padding: 4px 24px;
+    padding: 2px 12px;
     border-radius: 4px;
     font-family: 'Oswald', sans-serif;
     text-transform: uppercase;
@@ -101,22 +101,22 @@
 }
 
     #components-reconnect-modal button:hover {
-        background-color: #B22222;
+        background: linear-gradient(135deg, #ff4569, #f06292);
     }
 
     #components-reconnect-modal button:active {
-        background-color: #8B0000;
+        background-color: #c4001d;
     }
 
 .components-rejoining-animation {
     position: relative;
-    width: 80px;
-    height: 80px;
+    width: 60px;
+    height: 60px;
 }
 
     .components-rejoining-animation div {
         position: absolute;
-        border: 3px solid #E63946;
+        border: 3px solid #ff1744;
         opacity: 1;
         border-radius: 50%;
         animation: components-rejoining-animation 1.5s cubic-bezier(0, 0.2, 0.8, 1) infinite;
