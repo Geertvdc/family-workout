@@ -1,0 +1,214 @@
+name: Deploy to Azure
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: read
+  id-token: write  # Required for Azure login with OIDC
+
+env:
+  ACR_NAME: ffwodacr
+  API_IMAGE_NAME: familyfitness-api
+  BLAZOR_IMAGE_NAME: familyfitness-blazor
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: family_fitness
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore FamilyFitness.sln
+
+      - name: Build solution
+        run: dotnet build FamilyFitness.sln --configuration Release --no-restore
+
+      - name: Run tests
+        env:
+          ConnectionStrings__postgres: "Host=localhost;Port=5432;Database=family_fitness;Username=postgres;Password=postgres"
+        run: dotnet test FamilyFitness.sln --configuration Release --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: '**/TestResults/*.trx'
+          retention-days: 30
+
+  build-containers:
+    name: Build and Push Containers
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    environment: acr  # Use the 'acr' environment with secrets
+    
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tag }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Generate image tag
+        id: meta
+        run: |
+          # Use short SHA for tagging
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          echo "tag=${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "Image tag: ${SHORT_SHA}"
+
+      - name: Login to Azure Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.ACR_LOGIN_SERVER }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build and push API container
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./src/FamilyFitness.Api/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.API_IMAGE_NAME }}:${{ steps.meta.outputs.tag }}
+            ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.API_IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push Blazor container
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./src/FamilyFitness.Blazor/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.BLAZOR_IMAGE_NAME }}:${{ steps.meta.outputs.tag }}
+            ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.BLAZOR_IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-dev:
+    name: Deploy to Dev
+    runs-on: ubuntu-latest
+    needs: build-containers
+    if: github.event_name == 'pull_request'
+    environment: 
+      name: dev
+      url: https://ffwod-dev-blazor.azurecontainerapps.io
+    
+    steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy API to Dev
+        run: |
+          az containerapp update \
+            --name ffwod-dev-api \
+            --resource-group ffwod-dev-rg \
+            --image ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.API_IMAGE_NAME }}:${{ needs.build-containers.outputs.image-tag }}
+
+      - name: Deploy Blazor to Dev
+        run: |
+          az containerapp update \
+            --name ffwod-dev-blazor \
+            --resource-group ffwod-dev-rg \
+            --image ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.BLAZOR_IMAGE_NAME }}:${{ needs.build-containers.outputs.image-tag }}
+
+      - name: Comment PR with deployment info
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const comment = `### 🚀 Deployed to Dev Environment
+            
+            **Image Tag:** \`${{ needs.build-containers.outputs.image-tag }}\`
+            
+            **URLs:**
+            - 🌐 Blazor App: https://ffwod-dev-blazor.azurecontainerapps.io
+            - 🔌 API: https://ffwod-dev-api.azurecontainerapps.io
+            
+            **Container Images:**
+            - API: \`${{ secrets.ACR_LOGIN_SERVER }}/${{ env.API_IMAGE_NAME }}:${{ needs.build-containers.outputs.image-tag }}\`
+            - Blazor: \`${{ secrets.ACR_LOGIN_SERVER }}/${{ env.BLAZOR_IMAGE_NAME }}:${{ needs.build-containers.outputs.image-tag }}\`
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  deploy-prod:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: build-containers
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: 
+      name: prod
+      url: https://ffwod-prod-blazor.azurecontainerapps.io
+    
+    steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy API to Prod
+        run: |
+          az containerapp update \
+            --name ffwod-prod-api \
+            --resource-group ffwod-prod-rg \
+            --image ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.API_IMAGE_NAME }}:${{ needs.build-containers.outputs.image-tag }}
+
+      - name: Deploy Blazor to Prod
+        run: |
+          az containerapp update \
+            --name ffwod-prod-blazor \
+            --resource-group ffwod-prod-rg \
+            --image ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.BLAZOR_IMAGE_NAME }}:${{ needs.build-containers.outputs.image-tag }}
+
+      - name: Create deployment summary
+        run: |
+          echo "### ✅ Production Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Image Tag:** \`${{ needs.build-containers.outputs.image-tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**URLs:**" >> $GITHUB_STEP_SUMMARY
+          echo "- 🌐 Blazor App: https://ffwod-prod-blazor.azurecontainerapps.io" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔌 API: https://ffwod-prod-api.azurecontainerapps.io" >> $GITHUB_STEP_SUMMARY
