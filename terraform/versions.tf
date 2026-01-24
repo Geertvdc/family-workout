@@ -16,4 +16,7 @@ provider "azurerm" {
     }
   }
   subscription_id = var.subscription_id
+  
+  # Use OIDC authentication when running in GitHub Actions
+  use_oidc = true
 }
