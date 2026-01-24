@@ -416,3 +416,9 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# Terraform / OpenTofu
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+terraform/github-oidc-credentials.txt
