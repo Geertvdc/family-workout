@@ -47,6 +47,28 @@ This creates:
 
 **Important**: Save the ACR credentials from the output - you'll need them for GitHub Secrets.
 
+### 1a. Setup GitHub OIDC (Federated Identity)
+
+We use **federated identity** instead of service principal secrets for better security:
+
+```bash
+cd terraform
+./setup-github-oidc.sh
+```
+
+This will:
+- Create Azure AD application
+- Create service principal with Contributor role
+- Configure federated credentials for GitHub Actions (main, PRs, environments)
+- Output the secrets you need to add to GitHub
+
+**Add these secrets to GitHub** (Settings → Secrets and variables → Actions):
+- `AZURE_CLIENT_ID`
+- `AZURE_TENANT_ID`
+- `AZURE_SUBSCRIPTION_ID`
+
+See `.github/DEPLOYMENT.md` for detailed instructions.
+
 ### 2. Configure Entra External ID
 
 Update both `dev.tfvars` and `prod.tfvars` with your Entra Client ID:

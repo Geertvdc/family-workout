@@ -42,44 +42,102 @@ az acr show --name ffwodacr --query loginServer -o tsv
 az acr credential show --name ffwodacr
 ```
 
-### 2. Azure Credentials Secret
+### 2. Azure Federated Identity Credentials (OIDC)
 
-You need an Azure Service Principal for deploying to Container Apps.
+We use **Federated Identity** (OIDC) instead of service principals with secrets. This is more secure as no long-lived credentials are stored.
 
-**Create the Service Principal:**
+**Step 1: Create Azure Application (Service Principal)**
 
 ```bash
-# Get your subscription ID
-az account show --query id -o tsv
+# Create the app registration (replace with your GitHub org/username and repo)
+GITHUB_ORG="Geertvdc"  # Or your organization name
+GITHUB_REPO="family-workout"
+APP_NAME="github-actions-ffwod"
 
-# Create service principal with Contributor role
-az ad sp create-for-rbac \
-  --name "github-actions-ffwod" \
+# Create the app
+APP_ID=$(az ad app create \
+  --display-name "${APP_NAME}" \
+  --query appId -o tsv)
+
+echo "Application ID: ${APP_ID}"
+
+# Create service principal
+SP_ID=$(az ad sp create --id ${APP_ID} --query id -o tsv)
+echo "Service Principal Object ID: ${SP_ID}"
+
+# Assign Contributor role to subscription
+SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+az role assignment create \
   --role contributor \
-  --scopes /subscriptions/b8affb75-1fd8-4116-8065-dc871fdbe8bc \
-  --sdk-auth
+  --subscription ${SUBSCRIPTION_ID} \
+  --assignee-object-id ${SP_ID} \
+  --assignee-principal-type ServicePrincipal
+
+# Get tenant ID
+TENANT_ID=$(az account show --query tenantId -o tsv)
+echo "Tenant ID: ${TENANT_ID}"
 ```
 
-This will output JSON like:
-```json
-{
-  "clientId": "...",
-  "clientSecret": "...",
-  "subscriptionId": "...",
-  "tenantId": "...",
-  "activeDirectoryEndpointUrl": "...",
-  "resourceManagerEndpointUrl": "...",
-  "activeDirectoryGraphResourceId": "...",
-  "sqlManagementEndpointUrl": "...",
-  "galleryEndpointUrl": "...",
-  "managementEndpointUrl": "..."
-}
+**Step 2: Configure Federated Credentials**
+
+```bash
+# Create federated credential for main branch
+az ad app federated-credential create \
+  --id ${APP_ID} \
+  --parameters '{
+    "name": "github-main",
+    "issuer": "https://token.actions.githubusercontent.com",
+    "subject": "repo:'"${GITHUB_ORG}"'/'"${GITHUB_REPO}"':ref:refs/heads/main",
+    "audiences": ["api://AzureADTokenExchange"]
+  }'
+
+# Create federated credential for pull requests
+az ad app federated-credential create \
+  --id ${APP_ID} \
+  --parameters '{
+    "name": "github-pr",
+    "issuer": "https://token.actions.githubusercontent.com",
+    "subject": "repo:'"${GITHUB_ORG}"'/'"${GITHUB_REPO}"':pull_request",
+    "audiences": ["api://AzureADTokenExchange"]
+  }'
+
+# Create federated credential for dev environment
+az ad app federated-credential create \
+  --id ${APP_ID} \
+  --parameters '{
+    "name": "github-env-dev",
+    "issuer": "https://token.actions.githubusercontent.com",
+    "subject": "repo:'"${GITHUB_ORG}"'/'"${GITHUB_REPO}"':environment:dev",
+    "audiences": ["api://AzureADTokenExchange"]
+  }'
+
+# Create federated credential for prod environment
+az ad app federated-credential create \
+  --id ${APP_ID} \
+  --parameters '{
+    "name": "github-env-prod",
+    "issuer": "https://token.actions.githubusercontent.com",
+    "subject": "repo:'"${GITHUB_ORG}"'/'"${GITHUB_REPO}"':environment:prod",
+    "audiences": ["api://AzureADTokenExchange"]
+  }'
+
+# Summary - Save these values!
+echo "======================================"
+echo "Add these secrets to GitHub:"
+echo "======================================"
+echo "AZURE_CLIENT_ID: ${APP_ID}"
+echo "AZURE_TENANT_ID: ${TENANT_ID}"
+echo "AZURE_SUBSCRIPTION_ID: ${SUBSCRIPTION_ID}"
+echo "======================================"
 ```
 
-**Add to GitHub:**
+**Step 3: Add Secrets to GitHub**
+
 1. Go to your repository → Settings → Secrets and variables → Actions
-2. Create a **Repository secret** named `AZURE_CREDENTIALS`
-3. Paste the entire JSON output from above
+2. Create these **Repository secrets**:
+   - `AZURE_CLIENT_ID` - The Application (client) ID from above
+   - `AZURE_TENANT_ID` - Your Azure tenant ID
+   - `AZURE_SUBSCRIPTION_ID` - Your Azure subscription ID (b8affb75-1fd8-4116-8065-dc871fdbe8bc)
 
 ### 3. Optional: Environment-Specific Secrets
 
