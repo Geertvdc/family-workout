@@ -5,6 +5,9 @@ using FamilyFitness.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Npgsql;
+using Azure.Identity;
+using Azure.Core;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,8 +34,23 @@ else
     var connectionString = builder.Configuration.GetConnectionString("family-fitness")
         ?? throw new InvalidOperationException("PostgreSQL connection string not found");
 
+    // Configure Npgsql to use Azure.Identity for managed identity authentication
+    var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
+    
+    // Add periodic token refresh for Azure AD authentication
+    dataSourceBuilder.UsePeriodicPasswordProvider(async (_, ct) =>
+    {
+        var credential = new DefaultAzureCredential();
+        var token = await credential.GetTokenAsync(
+            new TokenRequestContext(new[] { "https://ossrdbms-aad.database.windows.net/.default" }),
+            ct);
+        return token.Token;
+    }, TimeSpan.FromHours(1), TimeSpan.FromSeconds(10));
+    
+    var dataSource = dataSourceBuilder.Build();
+
     builder.Services.AddDbContext<FamilyFitnessDbContext>(options =>
-        options.UseNpgsql(connectionString));
+        options.UseNpgsql(dataSource));
 }
 
 // Register repositories
@@ -85,13 +103,11 @@ app.UseAuthorization();
 
 
 
-// Ensure database is created and seeded (for Development)
-if (app.Environment.IsDevelopment())
+// Run migrations on startup for all environments
+using (var scope = app.Services.CreateScope())
 {
-    using var scope = app.Services.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<FamilyFitnessDbContext>();
     
-    // Retry logic to wait for PostgreSQL to be ready
     var maxRetries = 30;
     var delay = TimeSpan.FromSeconds(2);
     
@@ -99,17 +115,28 @@ if (app.Environment.IsDevelopment())
     {
         try
         {
-            await dbContext.Database.EnsureCreatedAsync();
+            app.Logger.LogInformation("Running database migrations... (Attempt {Attempt}/{MaxRetries})", i + 1, maxRetries);
+            await dbContext.Database.MigrateAsync();
+            app.Logger.LogInformation("Database migrations completed successfully");
             
-            // Seed the database with sample data
-            await DatabaseSeeder.SeedAsync(dbContext);
+            // Seed only in Development
+            if (app.Environment.IsDevelopment())
+            {
+                await DatabaseSeeder.SeedAsync(dbContext);
+                app.Logger.LogInformation("Database seeded successfully");
+            }
             
             break;
         }
-        catch (Npgsql.NpgsqlException) when (i < maxRetries - 1)
+        catch (Exception ex) when (i < maxRetries - 1)
         {
-            app.Logger.LogInformation("Waiting for PostgreSQL to be ready... (Attempt {Attempt}/{MaxRetries})", i + 1, maxRetries);
+            app.Logger.LogWarning(ex, "Migration attempt {Attempt}/{MaxRetries} failed, retrying in {Delay} seconds...", 
+                i + 1, maxRetries, delay.TotalSeconds);
             await Task.Delay(delay);
+        }
+        catch (Exception ex) when (i == maxRetries - 1)
+        {
+            app.Logger.LogError(ex, "Failed to run migrations after {MaxRetries} attempts. Application will continue but may not function correctly.", maxRetries);
         }
     }
 }
