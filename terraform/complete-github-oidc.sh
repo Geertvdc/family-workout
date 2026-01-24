@@ -8,51 +8,26 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 echo -e "${GREEN}============================================${NC}"
-echo -e "${GREEN}GitHub OIDC Federated Identity Setup${NC}"
+echo -e "${GREEN}Complete GitHub OIDC Setup${NC}"
 echo -e "${GREEN}============================================${NC}"
 echo ""
 
-# Get GitHub repository info
-read -p "Enter your GitHub username/organization (e.g., Geertvdc): " GITHUB_ORG
-read -p "Enter your GitHub repository name (e.g., family-workout): " GITHUB_REPO
-
-APP_NAME="github-actions-ffwod"
-
-echo ""
-echo -e "${YELLOW}Creating Azure AD Application...${NC}"
-
-# Create the app registration
-APP_ID=$(az ad app create \
-  --display-name "${APP_NAME}" \
-  --query appId -o tsv)
-
-if [ -z "$APP_ID" ]; then
-  echo -e "${RED}Failed to create Azure AD application${NC}"
-  exit 1
-fi
-
-echo -e "${GREEN}✓ Application created${NC}"
-echo "  Application ID: ${APP_ID}"
-
-# Create service principal
-echo ""
-echo -e "${YELLOW}Creating Service Principal...${NC}"
-SP_ID=$(az ad sp create --id ${APP_ID} --query id -o tsv)
-
-if [ -z "$SP_ID" ]; then
-  echo -e "${RED}Failed to create service principal${NC}"
-  exit 1
-fi
-
-echo -e "${GREEN}✓ Service Principal created${NC}"
-echo "  Object ID: ${SP_ID}"
+# Use the existing application
+APP_ID="59ae5c04-3196-494d-90bf-c4c2e70a7b8a"
+SP_ID="4fec12cf-e64f-43d1-902a-bcec1fa5556d"
+GITHUB_ORG="Geertvdc"
+GITHUB_REPO="family-workout"
 
 # Get subscription and tenant info
 SUBSCRIPTION_ID=$(az account show --query id -o tsv)
 TENANT_ID=$(az account show --query tenantId -o tsv)
 
-# Assign Contributor role
+echo -e "${YELLOW}Using existing application:${NC}"
+echo "  Application ID: ${APP_ID}"
+echo "  Service Principal Object ID: ${SP_ID}"
 echo ""
+
+# Assign Contributor role
 echo -e "${YELLOW}Assigning Contributor role to subscription...${NC}"
 az role assignment create \
   --role contributor \
@@ -119,7 +94,7 @@ az ad app federated-credential create \
 
 echo -e "${GREEN}✓ Prod environment credential created${NC}"
 
-# ACR environment credential (for ACR login)
+# ACR environment credential
 az ad app federated-credential create \
   --id ${APP_ID} \
   --parameters "{
@@ -163,7 +138,7 @@ AZURE_TENANT_ID=${TENANT_ID}
 AZURE_SUBSCRIPTION_ID=${SUBSCRIPTION_ID}
 ========================================
 
-Application Name: ${APP_NAME}
+Application Name: github-actions-ffwod
 Service Principal Object ID: ${SP_ID}
 
 Federated Credentials Created:
