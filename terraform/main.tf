@@ -50,6 +50,11 @@ resource "azurerm_postgresql_flexible_server" "main" {
   geo_redundant_backup_enabled = false
 
   public_network_access_enabled = true
+
+  # Ignore zone changes since we don't use high availability
+  lifecycle {
+    ignore_changes = [zone]
+  }
 }
 
 # PostgreSQL Firewall Rule - Allow Azure Services
