@@ -117,7 +117,7 @@ resource "azurerm_container_app" "api" {
 
   template {
     container {
-      name   = "api"
+      name = "api"
       # Use placeholder image initially - deploy workflow will update with real app
       image  = "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
       cpu    = var.api_cpu
@@ -216,7 +216,7 @@ resource "azurerm_container_app" "blazor" {
 
   template {
     container {
-      name   = "blazor"
+      name = "blazor"
       # Use placeholder image initially - deploy workflow will update with real app
       image  = "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
       cpu    = var.blazor_cpu
