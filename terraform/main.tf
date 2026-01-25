@@ -118,7 +118,8 @@ resource "azurerm_container_app" "api" {
   template {
     container {
       name   = "api"
-      image  = "${data.azurerm_container_registry.shared.login_server}/familyfitness-api:latest"
+      # Use placeholder image initially - deploy workflow will update with real app
+      image  = "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
       cpu    = var.api_cpu
       memory = var.api_memory
 
@@ -168,6 +169,11 @@ resource "azurerm_container_app" "api" {
       percentage      = 100
     }
   }
+
+  lifecycle {
+    # Ignore changes to container image - managed by deploy workflow
+    ignore_changes = [template[0].container[0].image]
+  }
 }
 
 # Grant API managed identity ACR pull access
@@ -211,7 +217,8 @@ resource "azurerm_container_app" "blazor" {
   template {
     container {
       name   = "blazor"
-      image  = "${data.azurerm_container_registry.shared.login_server}/familyfitness-blazor:latest"
+      # Use placeholder image initially - deploy workflow will update with real app
+      image  = "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
       cpu    = var.blazor_cpu
       memory = var.blazor_memory
 
@@ -259,6 +266,11 @@ resource "azurerm_container_app" "blazor" {
       latest_revision = true
       percentage      = 100
     }
+  }
+
+  lifecycle {
+    # Ignore changes to container image - managed by deploy workflow
+    ignore_changes = [template[0].container[0].image]
   }
 }
 
