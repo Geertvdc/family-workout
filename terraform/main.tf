@@ -34,21 +34,21 @@ resource "azurerm_postgresql_flexible_server" "main" {
   resource_group_name = azurerm_resource_group.main.name
   location            = azurerm_resource_group.main.location
   version             = "17"
-  
+
   # Use managed identity for admin instead of password
   authentication {
     active_directory_auth_enabled = true
-    password_auth_enabled          = false
+    password_auth_enabled         = false
   }
-  
+
   storage_mb   = var.db_storage_mb
   storage_tier = "P4"
-  
+
   sku_name = var.db_sku_name
-  
+
   backup_retention_days        = 7
   geo_redundant_backup_enabled = false
-  
+
   public_network_access_enabled = true
 }
 
@@ -157,7 +157,7 @@ resource "azurerm_container_app" "api" {
   ingress {
     external_enabled = true
     target_port      = 8080
-    
+
     traffic_weight {
       latest_revision = true
       percentage      = 100
@@ -249,7 +249,7 @@ resource "azurerm_container_app" "blazor" {
   ingress {
     external_enabled = true
     target_port      = 8080
-    
+
     traffic_weight {
       latest_revision = true
       percentage      = 100

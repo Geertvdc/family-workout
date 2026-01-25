@@ -1,6 +1,6 @@
 terraform {
   required_version = ">= 1.6"
-  
+
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
@@ -16,7 +16,7 @@ provider "azurerm" {
     }
   }
   subscription_id = var.subscription_id
-  
+
   # Use OIDC authentication when running in GitHub Actions
   use_oidc = true
 }
