@@ -13,24 +13,7 @@ on:
     paths:
       - 'terraform/**'
       - '.github/workflows/infrastructure.yml'
-  workflow_dispatch:  # Allow manual trigger
-    inputs:
-      environment:
-        description: 'Environment to deploy'
-        required: true
-        type: choice
-        options:
-          - dev
-          - prod
-          - both
-      action:
-        description: 'Action to perform'
-        required: true
-        type: choice
-        options:
-          - plan
-          - apply
-          - destroy
+  workflow_dispatch:  # Manual trigger from any branch
 
 permissions:
   contents: read
@@ -44,11 +27,11 @@ env:
   ARM_USE_OIDC: true
 
 jobs:
-  tofu-plan-dev:
-    name: Plan Dev Infrastructure
+  infrastructure:
+    name: Manage Infrastructure
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && (inputs.environment == 'dev' || inputs.environment == 'both') && inputs.action == 'plan')
-    environment: dev
+    # Use prod environment only when deploying to main, otherwise dev
+    environment: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && 'prod' || 'dev' }}
     
     steps:
       - name: Checkout code
@@ -66,32 +49,36 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: OpenTofu Init
+      # ========================================
+      # DEV ENVIRONMENT
+      # ========================================
+      
+      - name: Dev - Init
         working-directory: terraform
         run: tofu init -backend-config="key=dev.tfstate"
 
-      - name: OpenTofu Format Check
+      - name: Dev - Format Check
         working-directory: terraform
         run: tofu fmt -check
 
-      - name: OpenTofu Validate
+      - name: Dev - Validate
         working-directory: terraform
         run: tofu validate
 
-      - name: OpenTofu Plan
-        id: plan
+      - name: Dev - Plan
+        id: dev-plan
         working-directory: terraform
         run: |
-          tofu plan -var-file="dev.tfvars" -no-color -out=tfplan
-          tofu show -no-color tfplan > plan.txt
+          tofu plan -var-file="dev.tfvars" -no-color -out=tfplan-dev
+          tofu show -no-color tfplan-dev > plan-dev.txt
 
-      - name: Comment PR with Plan
+      - name: Dev - Comment PR
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            const plan = fs.readFileSync('terraform/plan.txt', 'utf8');
+            const plan = fs.readFileSync('terraform/plan-dev.txt', 'utf8');
             const truncatedPlan = plan.length > 65000 ? plan.substring(0, 65000) + '\n\n... (truncated)' : plan;
             
             const output = `### 🏗️ OpenTofu Plan - Dev Environment
@@ -104,10 +91,6 @@ jobs:
             \`\`\`
             
             </details>
-            
-            **Next Steps:**
-            - Review the plan above
-            - Merge PR to automatically apply changes
             `;
             
             github.rest.issues.createComment({
@@ -117,52 +100,13 @@ jobs:
               body: output
             });
 
-      - name: Upload Plan Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: tfplan-dev
-          path: terraform/tfplan
-          retention-days: 5
-
-  tofu-apply-dev:
-    name: Apply Dev Infrastructure
-    runs-on: ubuntu-latest
-    needs: tofu-plan-dev
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    environment: dev
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup OpenTofu
-        uses: opentofu/setup-opentofu@v1
-        with:
-          tofu_version: 1.6.0
-
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: OpenTofu Init
+      - name: Dev - Apply
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         working-directory: terraform
-        run: tofu init -backend-config="key=dev.tfstate"
+        run: tofu apply -auto-approve tfplan-dev
 
-      - name: Download Plan
-        uses: actions/download-artifact@v4
-        with:
-          name: tfplan-dev
-          path: terraform
-
-      - name: OpenTofu Apply
-        working-directory: terraform
-        run: tofu apply -auto-approve tfplan
-
-      - name: OpenTofu Output
-        id: output
+      - name: Dev - Output
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         working-directory: terraform
         run: |
           echo "### ✅ Dev Infrastructure Applied" >> $GITHUB_STEP_SUMMARY
@@ -171,58 +115,28 @@ jobs:
           tofu output >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
 
-  tofu-plan-prod:
-    name: Plan Prod Infrastructure
-    runs-on: ubuntu-latest
-    needs: tofu-plan-dev  # Wait for dev plan to succeed
-    if: |
-      (needs.tofu-plan-dev.result == 'success' || needs.tofu-plan-dev.result == 'skipped') &&
-      (github.event_name == 'pull_request' || 
-       (github.event_name == 'workflow_dispatch' && (inputs.environment == 'prod' || inputs.environment == 'both') && inputs.action == 'plan'))
-    environment: prod
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup OpenTofu
-        uses: opentofu/setup-opentofu@v1
-        with:
-          tofu_version: 1.6.0
-
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: OpenTofu Init
+      # ========================================
+      # PROD ENVIRONMENT
+      # ========================================
+      
+      - name: Prod - Init
         working-directory: terraform
         run: tofu init -backend-config="key=prod.tfstate" -reconfigure
 
-      - name: OpenTofu Format Check
-        working-directory: terraform
-        run: tofu fmt -check
-
-      - name: OpenTofu Validate
-        working-directory: terraform
-        run: tofu validate
-
-      - name: OpenTofu Plan
-        id: plan
+      - name: Prod - Plan
+        id: prod-plan
         working-directory: terraform
         run: |
-          tofu plan -var-file="prod.tfvars" -no-color -out=tfplan
-          tofu show -no-color tfplan > plan.txt
+          tofu plan -var-file="prod.tfvars" -no-color -out=tfplan-prod
+          tofu show -no-color tfplan-prod > plan-prod.txt
 
-      - name: Comment PR with Plan
+      - name: Prod - Comment PR
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            const plan = fs.readFileSync('terraform/plan.txt', 'utf8');
+            const plan = fs.readFileSync('terraform/plan-prod.txt', 'utf8');
             const truncatedPlan = plan.length > 65000 ? plan.substring(0, 65000) + '\n\n... (truncated)' : plan;
             
             const output = `### 🏗️ OpenTofu Plan - Prod Environment
@@ -236,9 +150,7 @@ jobs:
             
             </details>
             
-            **⚠️ Production Changes:**
-            - Review the plan carefully
-            - Merge PR to automatically apply changes
+            **⚠️ Production - Review carefully before merging**
             `;
             
             github.rest.issues.createComment({
@@ -248,52 +160,13 @@ jobs:
               body: output
             });
 
-      - name: Upload Plan Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: tfplan-prod
-          path: terraform/tfplan
-          retention-days: 5
-
-  tofu-apply-prod:
-    name: Apply Prod Infrastructure
-    runs-on: ubuntu-latest
-    needs: tofu-plan-prod
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    environment: prod
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup OpenTofu
-        uses: opentofu/setup-opentofu@v1
-        with:
-          tofu_version: 1.6.0
-
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: OpenTofu Init
+      - name: Prod - Apply
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         working-directory: terraform
-        run: tofu init -backend-config="key=prod.tfstate" -reconfigure
+        run: tofu apply -auto-approve tfplan-prod
 
-      - name: Download Plan
-        uses: actions/download-artifact@v4
-        with:
-          name: tfplan-prod
-          path: terraform
-
-      - name: OpenTofu Apply
-        working-directory: terraform
-        run: tofu apply -auto-approve tfplan
-
-      - name: OpenTofu Output
-        id: output
+      - name: Prod - Output
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         working-directory: terraform
         run: |
           echo "### ✅ Prod Infrastructure Applied" >> $GITHUB_STEP_SUMMARY
@@ -302,76 +175,11 @@ jobs:
           tofu output >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
 
-  tofu-manual:
-    name: Manual Infrastructure Action
-    runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && (inputs.action == 'apply' || inputs.action == 'destroy')
-    environment: ${{ inputs.environment == 'both' && 'dev' || inputs.environment }}
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup OpenTofu
-        uses: opentofu/setup-opentofu@v1
-        with:
-          tofu_version: 1.6.0
-
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: OpenTofu Init (Dev)
-        if: inputs.environment == 'dev' || inputs.environment == 'both'
-        working-directory: terraform
-        run: tofu init -backend-config="key=dev.tfstate"
-
-      - name: OpenTofu Init (Prod)
-        if: inputs.environment == 'prod'
-        working-directory: terraform
-        run: tofu init -backend-config="key=prod.tfstate" -reconfigure
-
-      - name: OpenTofu Plan (Dev)
-        if: inputs.action == 'apply' && (inputs.environment == 'dev' || inputs.environment == 'both')
-        working-directory: terraform
-        run: tofu plan -var-file="dev.tfvars"
-
-      - name: OpenTofu Apply (Dev)
-        if: inputs.action == 'apply' && (inputs.environment == 'dev' || inputs.environment == 'both')
-        working-directory: terraform
-        run: tofu apply -auto-approve -var-file="dev.tfvars"
-
-      - name: OpenTofu Destroy (Dev)
-        if: inputs.action == 'destroy' && (inputs.environment == 'dev' || inputs.environment == 'both')
-        working-directory: terraform
-        run: tofu destroy -auto-approve -var-file="dev.tfvars"
-
-      - name: OpenTofu Init (Prod - for both)
-        if: inputs.environment == 'both' && inputs.action != 'destroy'
-        working-directory: terraform
-        run: tofu init -backend-config="key=prod.tfstate" -reconfigure
-
-      - name: OpenTofu Plan (Prod)
-        if: inputs.action == 'apply' && (inputs.environment == 'prod' || inputs.environment == 'both')
-        working-directory: terraform
-        run: tofu plan -var-file="prod.tfvars"
-
-      - name: OpenTofu Apply (Prod)
-        if: inputs.action == 'apply' && (inputs.environment == 'prod' || inputs.environment == 'both')
-        working-directory: terraform
-        run: tofu apply -auto-approve -var-file="prod.tfvars"
-
-      - name: OpenTofu Destroy (Prod)
-        if: inputs.action == 'destroy' && (inputs.environment == 'prod' || inputs.environment == 'both')
-        working-directory: terraform
-        run: tofu destroy -auto-approve -var-file="prod.tfvars"
-
-      - name: Create Summary
+      - name: Final Summary
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         run: |
-          echo "### 🏗️ Manual Infrastructure Action Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Action:** ${{ inputs.action }}" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "**🎉 Infrastructure Deployment Complete**" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Dev environment updated" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Prod environment updated" >> $GITHUB_STEP_SUMMARY
