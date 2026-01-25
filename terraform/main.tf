@@ -125,7 +125,7 @@ resource "azurerm_container_app" "api" {
       # PostgreSQL connection using managed identity
       env {
         name  = "ConnectionStrings__family-fitness"
-        value = "Host=${azurerm_postgresql_flexible_server.main.fqdn};Database=family_fitness;Username=${azurerm_container_app.api.name};SSL Mode=Require"
+        value = "Host=${azurerm_postgresql_flexible_server.main.fqdn};Database=family_fitness;Username=ffwod-${var.environment}-api;SSL Mode=Require"
       }
 
       env {
