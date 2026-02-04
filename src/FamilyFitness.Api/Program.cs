@@ -34,19 +34,43 @@ else
     var connectionString = builder.Configuration.GetConnectionString("family-fitness")
         ?? throw new InvalidOperationException("PostgreSQL connection string not found");
 
-    // Configure Npgsql to use Azure.Identity for managed identity authentication
     var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
-    
-    // Add periodic token refresh for Azure AD authentication
-    dataSourceBuilder.UsePeriodicPasswordProvider(async (_, ct) =>
+
+    // Only enable Azure AD token auth (managed identity / Azure CLI) when the connection string
+    // does not already specify a password (e.g. local Aspire Postgres container).
+    var csb = new NpgsqlConnectionStringBuilder(connectionString);
+    var hasPassword = !string.IsNullOrWhiteSpace(csb.Password);
+    var hasPassfile = !string.IsNullOrWhiteSpace(csb.Passfile);
+
+    static bool LooksLikeAzurePostgres(string? host)
+        => !string.IsNullOrWhiteSpace(host) && host
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Any(h => h.EndsWith(".postgres.database.azure.com", StringComparison.OrdinalIgnoreCase));
+
+    var useAzureAdToken = builder.Configuration.GetValue<bool?>("Postgres:UseAzureAdToken")
+        ?? LooksLikeAzurePostgres(csb.Host);
+
+    if (useAzureAdToken)
     {
+        if (hasPassword || hasPassfile)
+        {
+            throw new InvalidOperationException(
+                "Postgres:UseAzureAdToken is enabled but the connection string also sets Password/Passfile. " +
+                "Remove the password fields when using Azure AD token authentication.");
+        }
+
         var credential = new DefaultAzureCredential();
-        var token = await credential.GetTokenAsync(
-            new TokenRequestContext(new[] { "https://ossrdbms-aad.database.windows.net/.default" }),
-            ct);
-        return token.Token;
-    }, TimeSpan.FromHours(1), TimeSpan.FromSeconds(10));
-    
+
+        // Add periodic token refresh for Azure AD authentication
+        dataSourceBuilder.UsePeriodicPasswordProvider(async (_, ct) =>
+        {
+            var token = await credential.GetTokenAsync(
+                new TokenRequestContext(new[] { "https://ossrdbms-aad.database.windows.net/.default" }),
+                ct);
+            return token.Token;
+        }, TimeSpan.FromHours(1), TimeSpan.FromSeconds(10));
+    }
+
     var dataSource = dataSourceBuilder.Build();
 
     builder.Services.AddDbContext<FamilyFitnessDbContext>(options =>

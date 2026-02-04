@@ -1,10 +1,19 @@
-﻿var builder = DistributedApplication.CreateBuilder(args);
+using Microsoft.Extensions.Configuration;
 
-// Add PostgreSQL database
-var postgresServer = builder.AddPostgres("postgres")
-    .WithLifetime(ContainerLifetime.Persistent);
+var builder = DistributedApplication.CreateBuilder(args);
 
-var postgresDb = postgresServer.AddDatabase("family-fitness");
+// PostgreSQL: by default we run a local container.
+// If Postgres:UseExternal (or Postgres:UseAzureAdToken) is enabled, we instead use the
+// externally provided ConnectionStrings:family-fitness (e.g. Azure Database for PostgreSQL).
+var useExternalPostgres = builder.Configuration.GetValue<bool?>("Postgres:UseExternal")
+    ?? builder.Configuration.GetValue<bool?>("Postgres:UseAzureAdToken")
+    ?? false;
+
+var postgresDb = useExternalPostgres
+    ? builder.AddConnectionString("family-fitness")
+    : builder.AddPostgres("postgres")
+        .WithLifetime(ContainerLifetime.Persistent)
+        .AddDatabase("family-fitness");
 
 // Add the API project with PostgreSQL reference
 var api = builder.AddProject("api", "../../src/FamilyFitness.Api/FamilyFitness.Api.csproj")
