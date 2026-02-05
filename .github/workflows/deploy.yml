@@ -14,7 +14,7 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
+  pull-requests: write  # Required to comment on PRs
   id-token: write  # Required for Azure login with OIDC
 
 env:
