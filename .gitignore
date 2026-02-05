@@ -422,3 +422,6 @@ FodyWeavers.xsd
 *.tfstate
 *.tfstate.*
 terraform/github-oidc-credentials.txt
+
+# macOS Finder
+.DS_Store
