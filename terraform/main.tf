@@ -105,12 +105,10 @@ resource "azurerm_container_app" "api" {
     type = "SystemAssigned"
   }
 
-  # Registry configuration commented out to allow public placeholder image
-  # Deploy workflow will configure ACR access when switching to real app images
-  # registry {
-  #   server   = data.azurerm_container_registry.shared.login_server
-  #   identity = "system"
-  # }
+  registry {
+    server   = data.azurerm_container_registry.shared.login_server
+    identity = "system"
+  }
 
   secret {
     name  = "appinsights-connection-string"
@@ -206,12 +204,10 @@ resource "azurerm_container_app" "blazor" {
     type = "SystemAssigned"
   }
 
-  # Registry configuration commented out to allow public placeholder image
-  # Deploy workflow will configure ACR access when switching to real app images
-  # registry {
-  #   server   = data.azurerm_container_registry.shared.login_server
-  #   identity = "system"
-  # }
+  registry {
+    server   = data.azurerm_container_registry.shared.login_server
+    identity = "system"
+  }
 
   secret {
     name  = "appinsights-connection-string"
