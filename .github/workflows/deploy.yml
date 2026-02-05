@@ -21,6 +21,7 @@ env:
   ACR_NAME: ffwodacr
   API_IMAGE_NAME: familyfitness-api
   BLAZOR_IMAGE_NAME: familyfitness-blazor
+  ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
 
 jobs:
   build-and-test:
@@ -96,7 +97,7 @@ jobs:
       - name: Login to Azure Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ secrets.ACR_LOGIN_SERVER }}
+          registry: ${{ env.ACR_LOGIN_SERVER }}
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
@@ -107,8 +108,8 @@ jobs:
           file: ./src/FamilyFitness.Api/Dockerfile
           push: true
           tags: |
-            ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.API_IMAGE_NAME }}:${{ steps.meta.outputs.tag }}
-            ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.API_IMAGE_NAME }}:latest
+            ${{ env.ACR_LOGIN_SERVER }}/${{ env.API_IMAGE_NAME }}:${{ steps.meta.outputs.tag }}
+            ${{ env.ACR_LOGIN_SERVER }}/${{ env.API_IMAGE_NAME }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -119,8 +120,8 @@ jobs:
           file: ./src/FamilyFitness.Blazor/Dockerfile
           push: true
           tags: |
-            ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.BLAZOR_IMAGE_NAME }}:${{ steps.meta.outputs.tag }}
-            ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.BLAZOR_IMAGE_NAME }}:latest
+            ${{ env.ACR_LOGIN_SERVER }}/${{ env.BLAZOR_IMAGE_NAME }}:${{ steps.meta.outputs.tag }}
+            ${{ env.ACR_LOGIN_SERVER }}/${{ env.BLAZOR_IMAGE_NAME }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -146,14 +147,14 @@ jobs:
           az containerapp update \
             --name ffwod-dev-api \
             --resource-group ffwod-dev-rg \
-            --image ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.API_IMAGE_NAME }}:${{ needs.build-containers.outputs.image-tag }}
+            --image ${{ env.ACR_LOGIN_SERVER }}/${{ env.API_IMAGE_NAME }}:${{ needs.build-containers.outputs.image-tag }}
 
       - name: Deploy Blazor to Dev
         run: |
           az containerapp update \
             --name ffwod-dev-blazor \
             --resource-group ffwod-dev-rg \
-            --image ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.BLAZOR_IMAGE_NAME }}:${{ needs.build-containers.outputs.image-tag }}
+            --image ${{ env.ACR_LOGIN_SERVER }}/${{ env.BLAZOR_IMAGE_NAME }}:${{ needs.build-containers.outputs.image-tag }}
 
       - name: Comment PR with deployment info
         if: github.event_name == 'pull_request'
@@ -169,8 +170,8 @@ jobs:
             - 🔌 API: https://ffwod-dev-api.azurecontainerapps.io
             
             **Container Images:**
-            - API: \`${{ secrets.ACR_LOGIN_SERVER }}/${{ env.API_IMAGE_NAME }}:${{ needs.build-containers.outputs.image-tag }}\`
-            - Blazor: \`${{ secrets.ACR_LOGIN_SERVER }}/${{ env.BLAZOR_IMAGE_NAME }}:${{ needs.build-containers.outputs.image-tag }}\`
+            - API: \`${{ env.ACR_LOGIN_SERVER }}/${{ env.API_IMAGE_NAME }}:${{ needs.build-containers.outputs.image-tag }}\`
+            - Blazor: \`${{ env.ACR_LOGIN_SERVER }}/${{ env.BLAZOR_IMAGE_NAME }}:${{ needs.build-containers.outputs.image-tag }}\`
             `;
             
             github.rest.issues.createComment({
@@ -202,14 +203,14 @@ jobs:
           az containerapp update \
             --name ffwod-prod-api \
             --resource-group ffwod-prod-rg \
-            --image ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.API_IMAGE_NAME }}:${{ needs.build-containers.outputs.image-tag }}
+            --image ${{ env.ACR_LOGIN_SERVER }}/${{ env.API_IMAGE_NAME }}:${{ needs.build-containers.outputs.image-tag }}
 
       - name: Deploy Blazor to Prod
         run: |
           az containerapp update \
             --name ffwod-prod-blazor \
             --resource-group ffwod-prod-rg \
-            --image ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.BLAZOR_IMAGE_NAME }}:${{ needs.build-containers.outputs.image-tag }}
+            --image ${{ env.ACR_LOGIN_SERVER }}/${{ env.BLAZOR_IMAGE_NAME }}:${{ needs.build-containers.outputs.image-tag }}
 
       - name: Create deployment summary
         run: |
