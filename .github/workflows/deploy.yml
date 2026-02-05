@@ -147,14 +147,18 @@ jobs:
           az containerapp update \
             --name ffwod-dev-api \
             --resource-group ffwod-dev-rg \
-            --image ${{ env.ACR_LOGIN_SERVER }}/${{ env.API_IMAGE_NAME }}:${{ needs.build-containers.outputs.image-tag }}
+            --image ${{ env.ACR_LOGIN_SERVER }}/${{ env.API_IMAGE_NAME }}:${{ needs.build-containers.outputs.image-tag }} \
+            --registry-server ${{ env.ACR_LOGIN_SERVER }} \
+            --registry-identity system
 
       - name: Deploy Blazor to Dev
         run: |
           az containerapp update \
             --name ffwod-dev-blazor \
             --resource-group ffwod-dev-rg \
-            --image ${{ env.ACR_LOGIN_SERVER }}/${{ env.BLAZOR_IMAGE_NAME }}:${{ needs.build-containers.outputs.image-tag }}
+            --image ${{ env.ACR_LOGIN_SERVER }}/${{ env.BLAZOR_IMAGE_NAME }}:${{ needs.build-containers.outputs.image-tag }} \
+            --registry-server ${{ env.ACR_LOGIN_SERVER }} \
+            --registry-identity system
 
       - name: Comment PR with deployment info
         if: github.event_name == 'pull_request'
@@ -203,14 +207,18 @@ jobs:
           az containerapp update \
             --name ffwod-prod-api \
             --resource-group ffwod-prod-rg \
-            --image ${{ env.ACR_LOGIN_SERVER }}/${{ env.API_IMAGE_NAME }}:${{ needs.build-containers.outputs.image-tag }}
+            --image ${{ env.ACR_LOGIN_SERVER }}/${{ env.API_IMAGE_NAME }}:${{ needs.build-containers.outputs.image-tag }} \
+            --registry-server ${{ env.ACR_LOGIN_SERVER }} \
+            --registry-identity system
 
       - name: Deploy Blazor to Prod
         run: |
           az containerapp update \
             --name ffwod-prod-blazor \
             --resource-group ffwod-prod-rg \
-            --image ${{ env.ACR_LOGIN_SERVER }}/${{ env.BLAZOR_IMAGE_NAME }}:${{ needs.build-containers.outputs.image-tag }}
+            --image ${{ env.ACR_LOGIN_SERVER }}/${{ env.BLAZOR_IMAGE_NAME }}:${{ needs.build-containers.outputs.image-tag }} \
+            --registry-server ${{ env.ACR_LOGIN_SERVER }} \
+            --registry-identity system
 
       - name: Create deployment summary
         run: |
