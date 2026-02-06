@@ -62,6 +62,9 @@ jobs:
 
       - name: OpenTofu Plan
         working-directory: terraform
+        env:
+          TF_VAR_entra_blazor_client_id: ${{ secrets.ENTRA_BLAZOR_CLIENT_ID_DEV }}
+          TF_VAR_entra_blazor_client_secret: ${{ secrets.ENTRA_BLAZOR_CLIENT_SECRET_DEV }}
         run: |
           tofu plan -var-file="dev.tfvars" -no-color -out=tfplan
           tofu show -no-color tfplan > plan.txt
@@ -136,6 +139,9 @@ jobs:
 
       - name: OpenTofu Apply
         working-directory: terraform
+        env:
+          TF_VAR_entra_blazor_client_id: ${{ secrets.ENTRA_BLAZOR_CLIENT_ID_DEV }}
+          TF_VAR_entra_blazor_client_secret: ${{ secrets.ENTRA_BLAZOR_CLIENT_SECRET_DEV }}
         run: tofu apply -auto-approve tfplan
 
       - name: OpenTofu Output
@@ -183,6 +189,9 @@ jobs:
 
       - name: OpenTofu Plan
         working-directory: terraform
+        env:
+          TF_VAR_entra_blazor_client_id: ${{ secrets.ENTRA_BLAZOR_CLIENT_ID_PROD }}
+          TF_VAR_entra_blazor_client_secret: ${{ secrets.ENTRA_BLAZOR_CLIENT_SECRET_PROD }}
         run: |
           tofu plan -var-file="prod.tfvars" -no-color -out=tfplan
           tofu show -no-color tfplan > plan.txt
@@ -259,6 +268,9 @@ jobs:
 
       - name: OpenTofu Apply
         working-directory: terraform
+        env:
+          TF_VAR_entra_blazor_client_id: ${{ secrets.ENTRA_BLAZOR_CLIENT_ID_PROD }}
+          TF_VAR_entra_blazor_client_secret: ${{ secrets.ENTRA_BLAZOR_CLIENT_SECRET_PROD }}
         run: tofu apply -auto-approve tfplan
 
       - name: OpenTofu Output

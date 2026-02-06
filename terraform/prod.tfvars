@@ -20,5 +20,7 @@ blazor_max_replicas = 5
 
 # Azure Entra External ID
 entra_authority = "https://ffworkoutoftheday.ciamlogin.com/"
-entra_audience  = "3d9bde47-ee26-443f-9593-1ebb936982b2" # Replace with your actual client ID from Azure Portal
+entra_audience  = "3d9bde47-ee26-443f-9593-1ebb936982b2" # API app registration client ID
 entra_issuer    = ""
+entra_api_scope = "api://3d9bde47-ee26-443f-9593-1ebb936982b2/access_as_user"
+# Note: entra_blazor_client_id and entra_blazor_client_secret are passed via TF_VAR environment variables from GitHub secrets

@@ -89,3 +89,19 @@ variable "entra_issuer" {
   type        = string
   default     = ""
 }
+
+variable "entra_blazor_client_id" {
+  description = "Azure Entra External ID client ID for Blazor app"
+  type        = string
+}
+
+variable "entra_blazor_client_secret" {
+  description = "Azure Entra External ID client secret for Blazor app"
+  type        = string
+  sensitive   = true
+}
+
+variable "entra_api_scope" {
+  description = "Azure Entra External ID API scope for Blazor to call API"
+  type        = string
+}

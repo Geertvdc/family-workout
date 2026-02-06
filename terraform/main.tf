@@ -214,6 +214,11 @@ resource "azurerm_container_app" "blazor" {
     value = azurerm_application_insights.main.connection_string
   }
 
+  secret {
+    name  = "blazor-client-secret"
+    value = var.entra_blazor_client_secret
+  }
+
   template {
     container {
       name = "blazor"
@@ -244,6 +249,16 @@ resource "azurerm_container_app" "blazor" {
       }
 
       env {
+        name  = "AzureAd__ClientId"
+        value = var.entra_blazor_client_id
+      }
+
+      env {
+        name        = "AzureAd__ClientSecret"
+        secret_name = "blazor-client-secret"
+      }
+
+      env {
         name  = "AzureAd__Audience"
         value = var.entra_audience
       }
@@ -251,6 +266,11 @@ resource "azurerm_container_app" "blazor" {
       env {
         name  = "AzureAd__Issuer"
         value = var.entra_issuer != "" ? var.entra_issuer : var.entra_authority
+      }
+
+      env {
+        name  = "AzureAd__ApiScope"
+        value = var.entra_api_scope
       }
     }
 
