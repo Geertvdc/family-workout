@@ -6,10 +6,22 @@ using FamilyFitness.Blazor.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Identity.Web;
 using Microsoft.Identity.Web.TokenCacheProviders.InMemory;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure forwarded headers for running behind Azure Container Apps / reverse proxy
+// This ensures the app knows it's accessed via HTTPS even though the container receives HTTP
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost;
+    // Azure Container Apps uses a trusted proxy, so we clear the known networks/proxies
+    // to accept headers from any proxy (safe in Azure Container Apps environment)
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 builder.Services.AddAuthentication(options =>
 {
@@ -125,6 +137,10 @@ builder.Services.AddScoped(sp =>
 builder.Services.AddScoped<IUserContextService, UserContextService>();
 
 var app = builder.Build();
+
+// IMPORTANT: Use forwarded headers BEFORE any other middleware that needs to know the scheme/host
+// This must be called before UseAuthentication, UseHttpsRedirection, etc.
+app.UseForwardedHeaders();
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
