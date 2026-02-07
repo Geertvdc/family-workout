@@ -22,5 +22,5 @@ blazor_max_replicas = 5
 entra_authority = "https://ffworkoutoftheday.ciamlogin.com/"
 entra_audience  = "3d9bde47-ee26-443f-9593-1ebb936982b2" # API app registration client ID
 entra_issuer    = ""
-entra_api_scope = "api://3d9bde47-ee26-443f-9593-1ebb936982b2/access_as_user"
+entra_api_scope = "api://2b8a282a-98b0-4162-9553-4c5b8882bdcc/user_access"
 # Note: entra_blazor_client_id and entra_blazor_client_secret are passed via TF_VAR environment variables from GitHub secrets
