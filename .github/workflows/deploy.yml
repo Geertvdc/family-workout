@@ -129,7 +129,6 @@ jobs:
     name: Deploy to Dev
     runs-on: ubuntu-latest
     needs: build-containers
-    if: github.event_name == 'pull_request'
     environment: 
       name: dev
       url: https://ffwod-dev-blazor.azurecontainerapps.io
