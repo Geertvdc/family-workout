@@ -100,18 +100,73 @@ builder.Services.AddScoped<WorkoutSessionWorkoutTypeService>();
 builder.Services.AddScoped<WorkoutSessionParticipantService>();
 builder.Services.AddScoped<WorkoutIntervalScoreService>();
 
+// Log Azure AD configuration for debugging
+var authority = builder.Configuration["AzureAd:Authority"];
+var audience = builder.Configuration["AzureAd:Audience"];
+var issuer = builder.Configuration["AzureAd:Issuer"] ?? authority;
+builder.Services.AddLogging(loggingBuilder => loggingBuilder.AddConsole());
+var tempLogger = LoggerFactory.Create(b => b.AddConsole()).CreateLogger<Program>();
+tempLogger.LogInformation("[API CONFIG] AzureAd:Authority = {Authority}", authority ?? "NOT SET");
+tempLogger.LogInformation("[API CONFIG] AzureAd:Audience = {Audience}", audience ?? "NOT SET");
+tempLogger.LogInformation("[API CONFIG] AzureAd:Issuer = {Issuer}", issuer ?? "NOT SET");
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
         options.MapInboundClaims = false;
-        options.Authority = builder.Configuration["AzureAd:Authority"];
+        options.Authority = authority;
         options.TokenValidationParameters = new TokenValidationParameters
         {
-            ValidAudience = builder.Configuration["AzureAd:Audience"],
+            ValidAudience = audience,
             ValidateAudience = true,
             ValidateIssuer = true,
-            ValidIssuer = builder.Configuration["AzureAd:Issuer"] ?? builder.Configuration["AzureAd:Authority"],
+            ValidIssuer = issuer,
             NameClaimType = "name"
+        };
+        
+        // Add detailed event logging to debug token validation failures
+        options.Events = new JwtBearerEvents
+        {
+            OnAuthenticationFailed = context =>
+            {
+                var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                logger.LogError("[JWT AUTH FAILED] {Exception}", context.Exception.Message);
+                logger.LogError("[JWT AUTH FAILED] Exception Type: {Type}", context.Exception.GetType().Name);
+                if (context.Exception.InnerException != null)
+                {
+                    logger.LogError("[JWT AUTH FAILED] Inner Exception: {InnerException}", context.Exception.InnerException.Message);
+                }
+                return Task.CompletedTask;
+            },
+            OnTokenValidated = context =>
+            {
+                var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                logger.LogInformation("[JWT AUTH SUCCESS] Token validated for user: {User}", context.Principal?.Identity?.Name ?? "Unknown");
+                logger.LogInformation("[JWT AUTH SUCCESS] Claims: {Claims}", 
+                    string.Join(" | ", context.Principal?.Claims?.Select(c => $"{c.Type}={c.Value}") ?? Array.Empty<string>()));
+                return Task.CompletedTask;
+            },
+            OnChallenge = context =>
+            {
+                var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                logger.LogWarning("[JWT AUTH CHALLENGE] Error: {Error}, ErrorDescription: {ErrorDescription}", 
+                    context.Error ?? "none", context.ErrorDescription ?? "none");
+                logger.LogWarning("[JWT AUTH CHALLENGE] AuthenticateFailure: {Failure}", 
+                    context.AuthenticateFailure?.Message ?? "none");
+                return Task.CompletedTask;
+            },
+            OnMessageReceived = context =>
+            {
+                var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                var hasToken = !string.IsNullOrEmpty(context.Token);
+                logger.LogInformation("[JWT AUTH] Token received: {HasToken}, Path: {Path}", hasToken, context.Request.Path);
+                if (hasToken)
+                {
+                    logger.LogInformation("[JWT AUTH] Token length: {Length}, First 20 chars: {Preview}...", 
+                        context.Token.Length, context.Token.Substring(0, Math.Min(20, context.Token.Length)));
+                }
+                return Task.CompletedTask;
+            }
         };
     });
 
