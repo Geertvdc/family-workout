@@ -19,8 +19,9 @@ blazor_min_replicas = 1 # Always at least one running
 blazor_max_replicas = 5
 
 # Azure Entra External ID
-entra_authority = "https://ffworkoutoftheday.ciamlogin.com/"
-entra_audience  = "3d9bde47-ee26-443f-9593-1ebb936982b2" # API app registration client ID
-entra_issuer    = ""
+entra_tenant_id = "12094d72-73f9-4374-8d1e-8181315429a1"
+entra_authority = "https://12094d72-73f9-4374-8d1e-8181315429a1.ciamlogin.com/12094d72-73f9-4374-8d1e-8181315429a1/v2.0"
+entra_audience  = "2b8a282a-98b0-4162-9553-4c5b8882bdcc" # Blazor app client ID (this is what appears in the token's audience)
+entra_issuer    = "https://12094d72-73f9-4374-8d1e-8181315429a1.ciamlogin.com/12094d72-73f9-4374-8d1e-8181315429a1/v2.0"
 entra_api_scope = "api://2b8a282a-98b0-4162-9553-4c5b8882bdcc/user_access"
 # Note: entra_blazor_client_id and entra_blazor_client_secret are passed via TF_VAR environment variables from GitHub secrets

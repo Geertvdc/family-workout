@@ -74,6 +74,11 @@ variable "blazor_max_replicas" {
 }
 
 # Azure Entra ID (for user authentication)
+variable "entra_tenant_id" {
+  description = "Azure Entra External ID tenant ID (GUID)"
+  type        = string
+}
+
 variable "entra_authority" {
   description = "Azure Entra External ID authority URL"
   type        = string
