@@ -113,7 +113,7 @@
                     <button class="btn btn-success btn-lg" 
                             @onclick="HandleSaveAndNextStation"
                             disabled="@(!cooldownComplete || savingScores)">
-                        @(savingScores ? "SAVING..." : "NEXT STATION")
+                        @(savingScores ? "SAVING..." : (currentRound == TotalRounds && currentStation == StationsPerRound ? "FINISH WORKOUT" : "NEXT STATION"))
                     </button>
                 </div>
             </div>
